@@ -1,0 +1,77 @@
+/* App.css */
+
+body {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f8f9fa;
+  color: #343a40;
+}
+
+h1 {
+  text-align: center;
+  margin-top: 20px;
+  color: #495057;
+  font-weight: 700;
+}
+
+form {
+  max-width: 500px;
+  margin: 20px auto;
+  padding: 30px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+input,
+textarea,
+button {
+  width: 100%;
+  padding: 15px;
+  margin: 10px 0;
+  border: 1px solid #ced4da;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+button {
+  background-color: #007bff;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+.post {
+  max-width: 700px;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.post h2 {
+  margin-top: 0;
+  color: #495057;
+}
+
+.post p {
+  margin: 10px 0;
+  line-height: 1.6;
+}
+
+.post-category {
+  font-size: 14px;
+  color: #6c757d;
+}
+
+.post-author {
+  font-size: 14px;
+  color: #007bff;
+}

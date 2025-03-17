@@ -1,0 +1,4 @@
+[33m7cf6698[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Update application with latest changes
+[33m2fcdb8c[m sorta working, added react, username not showing on posts, need to add automatically refreshing to update posts and no auto logout on refresh.
+[33mcad6019[m first test
+[33m80d6709[m Initial commit
