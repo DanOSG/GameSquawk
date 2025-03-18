@@ -51,7 +51,7 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
    DB_HOST=localhost
    DB_USER=your_database_username
    DB_PASSWORD=your_database_password
-   DB_NAME=gamesquawk_db
+   DB_NAME=database_db
    JWT_SECRET=your_jwt_secret
    ```
 
