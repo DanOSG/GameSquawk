@@ -92,6 +92,34 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 3. **Interact**: Like posts and leave comments to engage with others
 4. **Customize**: Switch between dark and light mode for comfortable viewing
 
+## 🔧 Troubleshooting
+
+### Dependency Compatibility Issues
+If you encounter errors related to dependencies when installing or running the application (especially with React 19), use the following commands:
+
+For react-mde (markdown editor):
+```
+npm install react-mde --legacy-peer-deps
+```
+
+For socket.io-client (real-time communication):
+```
+npm install socket.io-client --legacy-peer-deps
+```
+
+These issues occur because some packages have peer dependencies on older React versions, but the project uses React 19. The `--legacy-peer-deps` flag allows npm to ignore peer dependency conflicts.
+
+Common errors you might see:
+```
+Error in ./src/PostForm.js
+Module not found: Can't resolve 'react-mde'
+```
+or
+```
+Error in ./src/PostForm.js
+Module not found: Can't resolve 'react-mde/lib/styles/css/react-mde-all.css'
+```
+
 ## 📱 Project Structure
 ```
 GameSquawk/
