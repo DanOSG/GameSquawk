@@ -54,15 +54,10 @@ const App = () => {
     <div className={`app ${isDarkMode ? 'dark' : 'light'}`}>
       <div className="banner"></div>
       <div className={`logo ${isSidebarOpen ? 'expanded' : ''}`}>
-        <video 
-          autoPlay 
-          loop 
-          muted 
-          playsInline
-          src="https://media.tenor.com/NRBEZ5m_UL4AAAPo/spider-man-dance.mp4"
-        >
-          <source src="https://media.tenor.com/NRBEZ5m_UL4AAAPo/spider-man-dance.mp4" type="video/mp4" />
-        </video>
+        <img 
+          src="/images/logo.png" 
+          alt="GameSquawk Logo" 
+        />
       </div>
       {token && (
         <>
@@ -79,7 +74,7 @@ const App = () => {
         </>
       )}
       <div className="app-container">
-        <h1>IDK Blog</h1>
+        <h1>GameSquawk</h1>
         {token ? (
           <>
             <PostForm token={token} />
