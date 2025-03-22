@@ -66,13 +66,27 @@ exports.updatePost = async (req, res) => {
 exports.deletePost = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('Delete post attempt - Post ID:', id);
+    console.log('User from token - ID:', req.user.id, 'Type:', typeof req.user.id);
+    
     const post = await Post.findByPk(id);
-    if (post && post.userId === req.user.id) {
+    
+    if (!post) {
+      console.log('Post not found');
+      return res.status(404).json({ message: 'Post not found' });
+    }
+    
+    console.log('Post found - User ID:', post.userId, 'Type:', typeof post.userId);
+    console.log('Comparison result:', post.userId === req.user.id);
+    console.log('String comparison:', String(post.userId) === String(req.user.id));
+    
+    // Try with type conversion to ensure comparison works
+    if (post && Number(post.userId) === Number(req.user.id)) {
       await post.destroy();
-      // Emit delete event to all clients
       req.io.emit('deletePost', id);
       res.json({ message: 'Post deleted successfully' });
     } else {
+      console.log('Authorization failed - IDs don\'t match');
       res.status(403).json({ message: 'Not authorized' });
     }
   } catch (error) {

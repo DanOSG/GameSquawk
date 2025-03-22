@@ -7,6 +7,8 @@ import PostList from './PostList';
 import Sidebar from './components/Sidebar';
 import { FiMenu } from 'react-icons/fi';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 const App = () => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [username, setUsername] = useState(localStorage.getItem('username'));
@@ -39,7 +41,7 @@ const App = () => {
 
   const handleDeletePost = async (postId) => {
     try {
-      await fetch(`http://localhost:3001/api/posts/${postId}`, {
+      await fetch(`${API_URL}/api/posts/${postId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
