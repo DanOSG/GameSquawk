@@ -5,6 +5,8 @@ import "react-mde/lib/styles/css/react-mde-all.css";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 const CATEGORIES = [
   'Technology',
   'Lifestyle',
@@ -39,8 +41,8 @@ const PostForm = ({ token }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      await axios.post('http://localhost:3001/api/posts', formData, {
+    try {console.log('Using API URL:', API_URL);
+      await axios.post(`${API_URL}/api/posts`, formData, {
         headers: { Authorization: `Bearer ${token}` },
       });
       // Clear form after successful submission

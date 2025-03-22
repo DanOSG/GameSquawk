@@ -11,6 +11,8 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 - **Real-time Updates**: Instant notifications using Socket.io
 - **Dark/Light Mode**: Customizable interface theme
 - **Responsive Design**: Works on desktop and mobile devices
+- **HTTPS Support**: Secure connection with SSL/TLS
+- **Domain Configuration**: Custom domain support
 
 ## 🔧 Technology Stack
 ### Frontend
@@ -18,12 +20,15 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 - CSS for styling
 - Socket.io client for real-time features
 - Markdown rendering for rich content
+- Environment variables for dynamic configuration
 
 ### Backend
 - Node.js with Express
 - MySQL database with Sequelize ORM
 - Socket.io for real-time communication
 - JWT for authentication
+- Nginx as reverse proxy
+- Let's Encrypt for SSL certificates
 
 ## 🚀 Getting Started
 
@@ -31,6 +36,8 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 - Node.js (v14 or later)
 - MySQL database
 - npm or yarn package manager
+- (Optional) Nginx for production deployment
+- (Optional) Domain name for production deployment
 
 ### Installation
 
@@ -73,7 +80,11 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 
 3. Create a `.env` file with:
    ```
+   # For local development
    REACT_APP_API_URL=http://localhost:3001
+   
+   # For production with domain (uncomment when deploying)
+   # REACT_APP_API_URL=https://yourdomain.com
    ```
 
 4. Start the development server:
@@ -84,6 +95,66 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 5. Open your browser and visit:
    ```
    http://localhost:3000
+   ```
+
+### Production Deployment
+
+#### Domain Configuration
+1. Update your domain's DNS settings to point to your server IP
+2. Configure Nginx:
+   ```
+   server {
+       server_name yourdomain.com;
+       
+       location / {
+           proxy_pass http://localhost:3000;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_cache_bypass $http_upgrade;
+       }
+       
+       location /api {
+           proxy_pass http://localhost:3001;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_cache_bypass $http_upgrade;
+       }
+       
+       location /socket.io {
+           proxy_pass http://localhost:3001;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_cache_bypass $http_upgrade;
+       }
+   }
+   ```
+
+#### SSL Configuration
+1. Install Certbot and the Nginx plugin:
+   ```
+   apt update && apt install -y certbot python3-certbot-nginx
+   ```
+
+2. Obtain and configure SSL certificate:
+   ```
+   certbot --nginx -d yourdomain.com
+   ```
+
+3. Update frontend environment:
+   ```
+   # frontend/.env
+   REACT_APP_API_URL=https://yourdomain.com
+   ```
+
+4. Rebuild the frontend:
+   ```
+   cd frontend && npm run build
    ```
 
 ## 📖 How to Use
@@ -109,16 +180,11 @@ npm install socket.io-client --legacy-peer-deps
 
 These issues occur because some packages have peer dependencies on older React versions, but the project uses React 19. The `--legacy-peer-deps` flag allows npm to ignore peer dependency conflicts.
 
-Common errors you might see:
-```
-Error in ./src/PostForm.js
-Module not found: Can't resolve 'react-mde'
-```
-or
-```
-Error in ./src/PostForm.js
-Module not found: Can't resolve 'react-mde/lib/styles/css/react-mde-all.css'
-```
+### SSL/HTTPS Issues
+If you encounter mixed content warnings:
+1. Ensure your `.env` file has `REACT_APP_API_URL` set to use `https://` protocol
+2. Rebuild the frontend application after making changes
+3. Check browser console for specific error messages
 
 ## 📱 Project Structure
 ```
