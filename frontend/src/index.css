@@ -19,7 +19,8 @@ form {
   max-width: 500px;
   margin: 20px auto;
   padding: 30px;
-  background-color: #ffffff;
+  background-color: var(--card, #ffffff);
+  color: var(--text, #343a40);
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
@@ -51,7 +52,8 @@ button:hover {
   max-width: 700px;
   margin: 20px auto;
   padding: 20px;
-  background-color: #ffffff;
+  background-color: var(--card, #ffffff);
+  color: var(--text, #343a40);
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }

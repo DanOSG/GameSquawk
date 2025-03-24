@@ -1,5 +1,6 @@
 import React from 'react';
-import { FiLogOut, FiSun, FiMoon, FiHome, FiBookmark, FiTrendingUp, FiSettings } from 'react-icons/fi';
+import { Link } from 'react-router-dom';
+import { FiLogOut, FiSun, FiMoon, FiHome, FiBookmark, FiTrendingUp, FiSettings, FiUser } from 'react-icons/fi';
 
 const Sidebar = ({ isOpen, onClose, onLogout, isDarkMode, toggleTheme }) => {
   return (
@@ -8,15 +9,18 @@ const Sidebar = ({ isOpen, onClose, onLogout, isDarkMode, toggleTheme }) => {
       <div className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-content">
           <div className="sidebar-section">
-            <button className="sidebar-item active">
+            <Link to="/" className="sidebar-item active" onClick={onClose}>
               <FiHome /> Home
-            </button>
+            </Link>
             <button className="sidebar-item">
               <FiTrendingUp /> Trending
             </button>
             <button className="sidebar-item">
               <FiBookmark /> Bookmarks
             </button>
+            <Link to="/profile" className="sidebar-item" onClick={onClose}>
+              <FiUser /> Profile
+            </Link>
           </div>
           
           <div className="sidebar-section">

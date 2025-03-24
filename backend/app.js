@@ -6,6 +6,8 @@ const sequelize = require('./config/config');
 const { setupAssociations } = require('./models/Post');
 const authRoutes = require('./routes/authRoutes');
 const postRoutes = require('./routes/postRoutes');
+const userRoutes = require('./routes/userRoutes');
+const path = require('path');
 require('dotenv').config();
 
 console.log(process.env.DB_USER, process.env.DB_PASSWORD);
@@ -21,6 +23,9 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from the public directory
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
@@ -42,6 +47,7 @@ setupAssociations();
 
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/users', userRoutes);
 
 const PORT = process.env.PORT || 3001;
 

@@ -7,6 +7,7 @@ import { BiCategory } from 'react-icons/bi';
 import { FaUser } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Link } from 'react-router-dom';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -27,6 +28,7 @@ const PostList = ({ token, onDeletePost }) => {
   const [comments, setComments] = useState({});
   const [showComments, setShowComments] = useState({});
   const [newComment, setNewComment] = useState({});
+  const [userAvatars, setUserAvatars] = useState({});
 
   // Move API calls to useCallback hooks
   const fetchLikeStatus = useCallback(async (postId) => {
@@ -69,10 +71,48 @@ const PostList = ({ token, onDeletePost }) => {
         ...prev,
         [postId]: response.data
       }));
+
+      // Fetch avatars for comment authors
+      response.data.forEach(comment => {
+        if (comment.userId && !userAvatars[comment.userId]) {
+          fetchUserAvatar(comment.userId);
+        }
+      });
     } catch (error) {
       console.error('Error fetching comments:', error);
     }
-  }, [token]);
+  }, [token, userAvatars]);
+
+  const fetchUserAvatar = useCallback(async (userId) => {
+    if (!token || userAvatars[userId] !== undefined) return;
+    
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/users/${userId}/avatar`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.avatar) {
+        setUserAvatars(prev => ({
+          ...prev,
+          [userId]: `${API_URL}${response.data.avatar}`
+        }));
+      } else {
+        // Store null if no avatar was found to prevent retrying
+        setUserAvatars(prev => ({
+          ...prev,
+          [userId]: null
+        }));
+      }
+    } catch (error) {
+      console.error(`Error fetching avatar for user ${userId}:`, error);
+      // Set null on error to prevent continuous retries
+      setUserAvatars(prev => ({
+        ...prev,
+        [userId]: null
+      }));
+    }
+  }, [token, API_URL, userAvatars]);
 
   const fetchPosts = useCallback(async () => {
     if (!token) {
@@ -97,6 +137,11 @@ const PostList = ({ token, onDeletePost }) => {
       response.data.forEach(post => {
         fetchLikeStatus(post.id);
         fetchComments(post.id);
+        
+        // Fetch avatar for post author
+        if (post.userId && !userAvatars[post.userId]) {
+          fetchUserAvatar(post.userId);
+        }
       });
     } catch (error) {
       console.error('Error fetching posts:', error.response || error);
@@ -104,7 +149,7 @@ const PostList = ({ token, onDeletePost }) => {
         console.log('Token might be invalid or expired');
       }
     }
-  }, [token, selectedCategory, fetchLikeStatus, fetchComments]);
+  }, [token, selectedCategory, fetchLikeStatus, fetchComments, fetchUserAvatar, userAvatars]);
 
   // Update useEffect hooks with proper dependencies
   useEffect(() => {
@@ -338,9 +383,18 @@ const PostList = ({ token, onDeletePost }) => {
                   <p className="post-category">
                     <BiCategory /> {post.category}
                   </p>
-                  <p className="post-author">
-                    <FaUser /> {post.User?.username || 'Unknown'}
-                  </p>
+                  <Link to={`/profile/${post.userId}`} className="post-author">
+                    {userAvatars[post.userId] ? (
+                      <img 
+                        src={userAvatars[post.userId]} 
+                        alt={post.User?.username} 
+                        className="post-author-avatar" 
+                      />
+                    ) : (
+                      <FaUser />
+                    )} 
+                    {post.User?.username || 'Unknown'}
+                  </Link>
                 </div>
                 <div className="post-content markdown-content">
                   <ReactMarkdown>{post.content || ''}</ReactMarkdown>
@@ -374,7 +428,18 @@ const PostList = ({ token, onDeletePost }) => {
                         <div key={comment.id} className="comment">
                           <p>{comment.content}</p>
                           <div className="comment-meta">
-                            <span>{comment.User?.username || 'Unknown'}</span>
+                            <Link to={`/profile/${comment.userId}`} className="comment-author">
+                              {userAvatars[comment.userId] ? (
+                                <img 
+                                  src={userAvatars[comment.userId]} 
+                                  alt={comment.User?.username} 
+                                  className="comment-author-avatar" 
+                                />
+                              ) : (
+                                <FaUser />
+                              )}
+                              <span>{comment.User?.username || 'Unknown'}</span>
+                            </Link>
                             {currentUserId === comment.userId && (
                               <button 
                                 onClick={() => handleDeleteComment(post.id, comment.id)}
