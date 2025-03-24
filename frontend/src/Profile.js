@@ -104,12 +104,15 @@ const Profile = ({ token, username, isDarkMode, onAvatarUpdate }) => {
         const formData = new FormData();
         formData.append('avatar', avatarFile);
         
-        await axios.put(`${API_URL}/api/users/avatar`, formData, {
+        console.log('Uploading avatar to:', `${API_URL}/api/users/avatar`);
+        const avatarResponse = await axios.put(`${API_URL}/api/users/avatar`, formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data'
           }
         });
+        
+        console.log('Avatar upload response:', avatarResponse.data);
         
         // Clear the file and preview after upload
         setAvatarFile(null);
@@ -127,6 +130,7 @@ const Profile = ({ token, username, isDarkMode, onAvatarUpdate }) => {
       fetchProfile(); // Refresh profile data
     } catch (error) {
       console.error('Error updating profile:', error);
+      console.error('Error details:', error.response ? error.response.data : 'No response data');
       setError('Failed to update profile. Please try again.');
     }
   };

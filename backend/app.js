@@ -8,6 +8,7 @@ const authRoutes = require('./routes/authRoutes');
 const postRoutes = require('./routes/postRoutes');
 const userRoutes = require('./routes/userRoutes');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 console.log(process.env.DB_USER, process.env.DB_PASSWORD);
@@ -23,6 +24,13 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'public/uploads/avatars');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('Created uploads directory:', uploadsDir);
+}
 
 // Serve static files from the public directory
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));

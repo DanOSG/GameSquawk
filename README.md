@@ -10,8 +10,6 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 - **Interaction**: Like, dislike, and comment on posts
 - **Real-time Updates**: Instant notifications using Socket.io
 - **Dark/Light Mode**: Customizable interface theme
-- **User Profiles**: View public profiles of other users
-- **Avatar Support**: Upload and display profile pictures
 - **Responsive Design**: Works on desktop and mobile devices
 - **HTTPS Support**: Secure connection with SSL/TLS
 - **Domain Configuration**: Custom domain support
@@ -163,9 +161,7 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 1. **Register/Login**: Create an account or log in to access features
 2. **Create Posts**: Share your gaming experiences using the post form
 3. **Interact**: Like posts and leave comments to engage with others
-4. **View Profiles**: Click on a username or avatar to view that user's profile
-5. **Customize Profile**: Upload an avatar and update your profile information
-6. **Customize**: Switch between dark and light mode for comfortable viewing
+4. **Customize**: Switch between dark and light mode for comfortable viewing
 
 ## 🔧 Troubleshooting
 
