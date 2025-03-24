@@ -13,6 +13,7 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 - **Responsive Design**: Works on desktop and mobile devices
 - **HTTPS Support**: Secure connection with SSL/TLS
 - **Domain Configuration**: Custom domain support
+- **Social Login**: Optional integration with Discord, Steam, and Xbox Live (requires additional setup)
 
 ## 🔧 Technology Stack
 ### Frontend
@@ -29,6 +30,7 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 - JWT for authentication
 - Nginx as reverse proxy
 - Let's Encrypt for SSL certificates
+- Passport.js for authentication strategies
 
 ## 🚀 Getting Started
 
@@ -38,6 +40,7 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 - npm or yarn package manager
 - (Optional) Nginx for production deployment
 - (Optional) Domain name for production deployment
+- (Optional) API keys for social login providers
 
 ### Installation
 
@@ -54,13 +57,26 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 
 3. Create a `.env` file with the following variables:
    ```
+   # Required variables
    PORT=3001
    DB_HOST=localhost
    DB_USER=your_database_username
    DB_PASSWORD=your_database_password
    DB_NAME=database_db
    JWT_SECRET=your_jwt_secret
+   
+   # Optional - Social login (Discord)
+   # DISCORD_CLIENT_ID=your_discord_client_id
+   # DISCORD_CLIENT_SECRET=your_discord_client_secret
+   # DISCORD_CALLBACK_URL=http://localhost:3001/api/auth/discord/callback
+   
+   # Optional - Social login (Steam)
+   # STEAM_API_KEY=your_steam_api_key
+   # STEAM_RETURN_URL=http://localhost:3001/api/auth/steam/return
+   # STEAM_REALM=http://localhost:3001/
    ```
+
+   > **Important**: The application will run without the optional social login variables, but those login methods will be disabled. You must include `express-session` in your dependencies.
 
 4. Start the server:
    ```
@@ -75,7 +91,7 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 
 2. Install dependencies:
    ```
-   npm install
+   npm install --legacy-peer-deps
    ```
 
 3. Create a `.env` file with:
@@ -132,6 +148,13 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
            proxy_set_header Host $host;
            proxy_cache_bypass $http_upgrade;
        }
+       
+       location /uploads {
+           proxy_pass http://localhost:3001/uploads;
+           proxy_http_version 1.1;
+           proxy_set_header Host $host;
+           proxy_cache_bypass $http_upgrade;
+       }
    }
    ```
 
@@ -157,6 +180,28 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
    cd frontend && npm run build
    ```
 
+#### Using PM2 for Process Management
+1. Install PM2 globally:
+   ```
+   npm install -g pm2
+   ```
+
+2. Start the backend:
+   ```
+   cd backend && pm2 start app.js --name "gamesquawk-backend"
+   ```
+
+3. Serve the frontend build:
+   ```
+   cd frontend && pm2 start npm --name "gamesquawk-frontend" -- start
+   ```
+
+4. Configure PM2 to start on boot:
+   ```
+   pm2 startup
+   pm2 save
+   ```
+
 ## 📖 How to Use
 1. **Register/Login**: Create an account or log in to access features
 2. **Create Posts**: Share your gaming experiences using the post form
@@ -164,6 +209,12 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 4. **Customize**: Switch between dark and light mode for comfortable viewing
 
 ## 🔧 Troubleshooting
+
+### Missing Environment Variables
+If you encounter OAuth or authentication errors during startup:
+1. Check if your backend `.env` file has all required variables
+2. For social login, ensure all provider-specific variables are set or comment them out if not needed
+3. Make sure to install the `express-session` package: `npm install express-session`
 
 ### Dependency Compatibility Issues
 If you encounter errors related to dependencies when installing or running the application (especially with React 19), use the following commands:
@@ -185,6 +236,12 @@ If you encounter mixed content warnings:
 1. Ensure your `.env` file has `REACT_APP_API_URL` set to use `https://` protocol
 2. Rebuild the frontend application after making changes
 3. Check browser console for specific error messages
+
+### File Upload Issues
+If profile images are not showing after upload:
+1. Verify that the Nginx configuration includes the `/uploads` location block
+2. Check the permissions on the `/backend/public/uploads` directory
+3. Restart Nginx after making configuration changes
 
 ## 📱 Project Structure
 ```
