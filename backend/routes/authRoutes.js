@@ -12,27 +12,28 @@ router.post('/register', register);
 router.post('/login', login);
 
 // Discord authentication routes
-router.get('/discord', passport.authenticate('discord'));
+router.get('/discord', passport.authenticate('discord', {
+  scope: ['identify', 'email']
+}));
+
 router.get('/discord/callback', passport.authenticate('discord', {
-  failureRedirect: process.env.CLIENT_URL || 'http://localhost:3000'
+  failureRedirect: `${process.env.CLIENT_URL}/login?error=discord_auth_failed`
 }), (req, res) => {
-  // Generate JWT token for the authenticated user
   const token = jwt.sign({ userId: req.user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-  
-  // Redirect to frontend with token
-  res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth/callback?token=${token}&username=${req.user.username}`);
+  res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}&username=${req.user.username}`);
 });
 
 // Steam authentication routes
 router.get('/steam', passport.authenticate('steam'));
+
 router.get('/steam/callback', passport.authenticate('steam', {
-  failureRedirect: process.env.CLIENT_URL || 'http://localhost:3000'
+  failureRedirect: `${process.env.CLIENT_URL}/login?error=steam_auth_failed`
 }), (req, res) => {
   const token = jwt.sign({ userId: req.user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-  res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth/callback?token=${token}&username=${req.user.username}`);
+  res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}&username=${req.user.username}`);
 });
 
-// Xbox Live authentication route (manual implementation)
+// Xbox Live authentication route
 router.post('/xbox', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -63,7 +64,7 @@ router.post('/xbox', async (req, res) => {
         user = await User.create({
           username: xboxAuth.display_claims?.gtg || `Xbox User ${xboxAuth.xuid.substring(0, 5)}`,
           email,
-          password: await bcrypt.hash(Math.random().toString(36).substring(2), 10), // Random password
+          password: await bcrypt.hash(Math.random().toString(36).substring(2), 10),
           xboxId: xboxAuth.xuid
         });
       }
@@ -80,6 +81,12 @@ router.post('/xbox', async (req, res) => {
     console.error('Xbox authentication error:', error);
     res.status(401).json({ message: 'Xbox authentication failed' });
   }
+});
+
+// Error handling middleware
+router.use((err, req, res, next) => {
+  console.error('Auth route error:', err);
+  res.status(500).json({ message: 'Authentication error occurred' });
 });
 
 module.exports = router; 
