@@ -9,6 +9,8 @@ const postRoutes = require('./routes/postRoutes');
 const userRoutes = require('./routes/userRoutes');
 const path = require('path');
 const fs = require('fs');
+const session = require('express-session');
+const passport = require('./config/passport');
 require('dotenv').config();
 
 console.log(process.env.DB_USER, process.env.DB_PASSWORD);
@@ -22,8 +24,26 @@ const io = new Server(server, {
   }
 });
 
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true
+}));
 app.use(express.json());
+
+// Session configuration
+app.use(session({
+  secret: process.env.JWT_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 1 day
+  }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, 'public/uploads/avatars');

@@ -9,6 +9,7 @@ import Profile from './Profile';
 import PublicProfile from './PublicProfile';
 import Sidebar from './components/Sidebar';
 import { FiMenu } from 'react-icons/fi';
+import AuthCallback from './AuthCallback';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -66,7 +67,11 @@ const App = () => {
     setIsSidebarOpen(false);
   };
 
-  const toggleTheme = () => {
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
   };
 
@@ -87,36 +92,50 @@ const App = () => {
     <Router>
       <div className={`app ${isDarkMode ? 'dark' : 'light'}`}>
         <div className="banner"></div>
-        <div className={`logo ${isSidebarOpen ? 'expanded' : ''}`}>
+        
+        <div className="website-logo">
           <img 
             src="/images/logo.png" 
-            alt="GameSquawk Logo" 
+            alt="GameSquawk Logo"
           />
-          {token && userAvatar && (
-            <Link to="/profile" className="user-avatar-container">
+        </div>
+        
+        {token && (
+          <div 
+            className="user-avatar-menu" 
+            onClick={toggleSidebar}
+          >
+            {userAvatar ? (
               <img 
                 src={userAvatar} 
                 alt={username} 
                 className="user-avatar" 
               />
-            </Link>
-          )}
-        </div>
-        {token && (
-          <>
-            <button className="menu-button" onClick={() => setIsSidebarOpen(true)} aria-label="Open menu">
-              <FiMenu />
-            </button>
-            <Sidebar 
-              isOpen={isSidebarOpen}
-              onClose={() => setIsSidebarOpen(false)}
-              onLogout={handleLogout}
-              isDarkMode={isDarkMode}
-              toggleTheme={toggleTheme}
-              userAvatar={userAvatar}
-            />
-          </>
+            ) : (
+              <div className="avatar-placeholder">
+                {username ? username.charAt(0).toUpperCase() : '?'}
+              </div>
+            )}
+            <span className="username-display">{username}</span>
+            <FiMenu className="menu-icon" />
+          </div>
         )}
+        
+        {!token && (
+          <div className="menu-button" onClick={toggleSidebar}>
+            <FiMenu />
+          </div>
+        )}
+
+        <Sidebar 
+          isOpen={isSidebarOpen} 
+          onClose={() => setIsSidebarOpen(false)}
+          onLogout={handleLogout}
+          isDarkMode={isDarkMode}
+          toggleTheme={toggleDarkMode}
+          userAvatar={userAvatar}
+        />
+
         <div className="app-container">
           <h1>GameSquawk</h1>
           <Routes>
@@ -139,6 +158,9 @@ const App = () => {
                 <Route path="/profile/:userId" element={
                   <PublicProfile token={token} />
                 } />
+                <Route path="/auth/callback" element={
+                  <AuthCallback setToken={handleLogin} />
+                } />
                 <Route path="*" element={<Navigate to="/" />} />
               </>
             ) : (
@@ -148,6 +170,9 @@ const App = () => {
                     <Register />
                     <Login setToken={handleLogin} />
                   </>
+                } />
+                <Route path="/auth/callback" element={
+                  <AuthCallback setToken={handleLogin} />
                 } />
                 <Route path="*" element={<Navigate to="/" />} />
               </>
