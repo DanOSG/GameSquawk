@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
+import GameShowcase from './components/GameShowcase';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -59,21 +60,7 @@ const Profile = ({ token, username, isDarkMode, onAvatarUpdate }) => {
     setProfile({ ...profile, bio: e.target.value });
   };
 
-  const handleGameChange = (index, field, value) => {
-    const updatedGames = [...profile.favoriteGames];
-    updatedGames[index] = { ...updatedGames[index], [field]: value };
-    setProfile({ ...profile, favoriteGames: updatedGames });
-  };
-
-  const handleAddGame = () => {
-    setProfile({
-      ...profile,
-      favoriteGames: [...profile.favoriteGames, { title: '', platform: '' }]
-    });
-  };
-
-  const handleRemoveGame = (index) => {
-    const updatedGames = profile.favoriteGames.filter((_, i) => i !== index);
+  const handleGameChange = (updatedGames) => {
     setProfile({ ...profile, favoriteGames: updatedGames });
   };
 
@@ -219,79 +206,14 @@ const Profile = ({ token, username, isDarkMode, onAvatarUpdate }) => {
             <div className="form-group">
               <div className="games-header">
                 <label className="form-label">Favorite Games</label>
-                {isEditing && (
-                  <button 
-                    type="button" 
-                    className="btn btn-small" 
-                    onClick={handleAddGame}
-                    style={{ 
-                      backgroundColor: 'var(--primary)', 
-                      color: 'white' 
-                    }}
-                  >
-                    Add Game
-                  </button>
-                )}
               </div>
               
-              {profile.favoriteGames && profile.favoriteGames.length > 0 ? (
-                <div className="games-list">
-                  {profile.favoriteGames.map((game, index) => (
-                    <div key={index} className="game-item">
-                      <div className="game-content">
-                        {isEditing ? (
-                          <>
-                            <div className="game-inputs">
-                              <input
-                                type="text"
-                                className="form-control"
-                                placeholder="Game Title"
-                                value={game.title || ''}
-                                onChange={(e) => handleGameChange(index, 'title', e.target.value)}
-                                style={{ 
-                                  backgroundColor: isDarkMode ? 'var(--card)' : 'var(--input-bg)', 
-                                  color: 'var(--text)'
-                                }}
-                              />
-                              <input
-                                type="text"
-                                className="form-control"
-                                placeholder="Platform"
-                                value={game.platform || ''}
-                                onChange={(e) => handleGameChange(index, 'platform', e.target.value)}
-                                style={{ 
-                                  backgroundColor: isDarkMode ? 'var(--card)' : 'var(--input-bg)', 
-                                  color: 'var(--text)'
-                                }}
-                              />
-                            </div>
-                            <button 
-                              type="button" 
-                              className="btn btn-small btn-danger" 
-                              onClick={() => handleRemoveGame(index)}
-                              style={{ 
-                                backgroundColor: 'var(--danger)', 
-                                color: 'white' 
-                              }}
-                            >
-                              Remove
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <div>
-                              <strong>{game.title}</strong>
-                              {game.platform && <span className="platform-tag">{game.platform}</span>}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-subdued">No favorite games added yet.</p>
-              )}
+              <GameShowcase 
+                games={profile.favoriteGames || []} 
+                onGamesChange={handleGameChange} 
+                isEditing={isEditing}
+                isDarkMode={isDarkMode}
+              />
             </div>
             
             <div className="form-group">

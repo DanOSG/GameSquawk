@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import './App.css';
+import GameShowcase from './components/GameShowcase';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -75,23 +76,15 @@ const PublicProfile = ({ token }) => {
             </div>
           )}
           
-          {profile.favoriteGames && profile.favoriteGames.length > 0 && (
-            <div className="profile-section">
-              <h4>Favorite Games</h4>
-              <div className="games-list">
-                {profile.favoriteGames.map((game, index) => (
-                  <div key={index} className="game-item">
-                    <div className="game-content">
-                      <div>
-                        <strong>{game.title}</strong>
-                        {game.platform && <span className="platform-tag">{game.platform}</span>}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="profile-section">
+            <h4>Favorite Games</h4>
+            <GameShowcase 
+              games={profile.favoriteGames || []} 
+              onGamesChange={() => {}} // Read-only in public profile
+              isEditing={false}
+              isDarkMode={false}
+            />
+          </div>
           
           {profile.gamingStats && (
             <div className="profile-section">
