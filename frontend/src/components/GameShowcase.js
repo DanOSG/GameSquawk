@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import '../App.css';
+import { FaCircle, FaRegCircle, FaChevronLeft, FaChevronRight, FaTimes } from 'react-icons/fa';
 
 const GameShowcase = ({ games, onGamesChange, isEditing, isDarkMode }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -98,8 +99,26 @@ const GameShowcase = ({ games, onGamesChange, isEditing, isDarkMode }) => {
     }
   };
 
-  const goToSlide = (index) => {
+  const goToSlide = (index, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setActiveIndex(index);
+  };
+
+  const goToPrevSlide = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const newIndex = activeIndex === 0 ? games.length - 1 : activeIndex - 1;
+    setActiveIndex(newIndex);
+  };
+
+  const goToNextSlide = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const newIndex = (activeIndex + 1) % games.length;
+    setActiveIndex(newIndex);
   };
 
   return (
@@ -251,20 +270,73 @@ const GameShowcase = ({ games, onGamesChange, isEditing, isDarkMode }) => {
                         color: 'white',
                         border: 'none',
                         borderRadius: '50%',
-                        width: '30px',
-                        height: '30px',
+                        width: '36px',
+                        height: '36px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        fontSize: '18px'
                       }}
                     >
-                      ×
+                      <FaTimes />
                     </button>
                   )}
                 </div>
               </div>
             ))}
+            
+            {games.length > 1 && (
+              <>
+                <button 
+                  className="carousel-nav carousel-nav-prev" 
+                  onClick={goToPrevSlide}
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '10px',
+                    transform: 'translateY(-50%)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    zIndex: 2
+                  }}
+                >
+                  <FaChevronLeft />
+                </button>
+                
+                <button 
+                  className="carousel-nav carousel-nav-next" 
+                  onClick={goToNextSlide}
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    right: '10px',
+                    transform: 'translateY(-50%)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    zIndex: 2
+                  }}
+                >
+                  <FaChevronRight />
+                </button>
+              </>
+            )}
             
             <div 
               className="carousel-controls"
@@ -275,23 +347,26 @@ const GameShowcase = ({ games, onGamesChange, isEditing, isDarkMode }) => {
                 right: '0',
                 display: 'flex',
                 justifyContent: 'center',
-                gap: '8px'
+                gap: '8px',
+                zIndex: 2
               }}
             >
               {games.map((_, index) => (
                 <button
                   key={index}
                   className={`carousel-dot ${index === activeIndex ? 'active' : ''}`}
-                  onClick={() => goToSlide(index)}
+                  onClick={(e) => goToSlide(index, e)}
                   style={{
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
+                    background: 'transparent',
                     border: 'none',
-                    backgroundColor: index === activeIndex ? 'white' : 'rgba(255, 255, 255, 0.5)',
-                    cursor: 'pointer'
+                    padding: '5px',
+                    cursor: 'pointer',
+                    color: 'white',
+                    fontSize: '12px'
                   }}
-                />
+                >
+                  {index === activeIndex ? <FaCircle /> : <FaRegCircle />}
+                </button>
               ))}
             </div>
           </div>

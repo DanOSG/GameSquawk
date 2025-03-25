@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 import GameShowcase from './components/GameShowcase';
+import { FaCamera, FaUserCircle } from 'react-icons/fa';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -167,8 +168,24 @@ const Profile = ({ token, username, isDarkMode, onAvatarUpdate }) => {
               />
               {isEditing && (
                 <div className="avatar-edit">
-                  <label htmlFor="avatar-upload" className="avatar-edit-btn" style={{ background: 'var(--primary)' }}>
-                    <i className="fa fa-camera"></i>
+                  <label 
+                    htmlFor="avatar-upload" 
+                    className="avatar-edit-btn" 
+                    style={{ 
+                      background: 'var(--primary)',
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+                      transition: 'transform 0.2s ease',
+                    }}
+                    title="Change profile picture"
+                  >
+                    <FaCamera />
                   </label>
                   <input 
                     id="avatar-upload" 

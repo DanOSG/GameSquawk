@@ -1460,17 +1460,17 @@ textarea.mde-text {
 }
 
 .profile-avatar {
-  width: 150px;
-  height: 150px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid var(--primary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .avatar-edit {
   position: absolute;
-  bottom: 5px;
-  right: 5px;
+  bottom: 0;
+  right: 0;
 }
 
 .avatar-edit-btn {
@@ -1483,6 +1483,10 @@ textarea.mde-text {
   color: white;
   border-radius: 50%;
   cursor: pointer;
+}
+
+.avatar-edit-btn:hover {
+  transform: scale(1.1);
 }
 
 .hidden {
@@ -1967,4 +1971,23 @@ textarea.mde-text {
 
 .p-3 {
   padding: 1rem;
+}
+
+/* Enhanced carousel nav buttons */
+.carousel-nav {
+  opacity: 0.7;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.carousel-nav:hover {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.carousel-dot {
+  transition: transform 0.2s ease;
+}
+
+.carousel-dot:hover {
+  transform: scale(1.2);
 }

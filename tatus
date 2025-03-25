@@ -1,0 +1,5 @@
+[33mcommit 7eda668e8d3ae48f5a5e3775d3d955720f374b67[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: GameSquawk Admin <gamesquawk@example.com>
+Date:   Tue Mar 25 20:24:31 2025 +0000
+
+    Enhancement: Added game showcase with RAWG API integration and fixed authentication
