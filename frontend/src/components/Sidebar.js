@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FiX, FiSun, FiMoon, FiLogOut, FiHome, FiUser } from 'react-icons/fi';
+import { FiX, FiSun, FiMoon, FiLogOut, FiHome, FiUser, FiVideo } from 'react-icons/fi';
 
 const Sidebar = ({ 
   isOpen, 
@@ -34,6 +34,11 @@ const Sidebar = ({
             <Link to="/profile" className="sidebar-item" onClick={onClose}>
               <FiUser size={20} />
               <span>Profile</span>
+            </Link>
+
+            <Link to="/videos" className="sidebar-item" onClick={onClose}>
+              <FiVideo size={20} />
+              <span>Videos</span>
             </Link>
             
             <button 

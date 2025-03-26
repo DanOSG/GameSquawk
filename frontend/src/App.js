@@ -7,8 +7,12 @@ import PostForm from './PostForm';
 import PostList from './PostList';
 import Profile from './Profile';
 import PublicProfile from './PublicProfile';
+import VideoList from './VideoList';
+import VideoUpload from './VideoUpload';
+import VideoDetail from './VideoDetail';
 import Sidebar from './components/Sidebar';
 import { FiMenu } from 'react-icons/fi';
+import AuthCallback from './AuthCallback';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -157,6 +161,18 @@ const App = () => {
                 <Route path="/profile/:userId" element={
                   <PublicProfile token={token} />
                 } />
+                <Route path="/videos" element={
+                  <VideoList token={token} />
+                } />
+                <Route path="/videos/upload" element={
+                  <VideoUpload token={token} />
+                } />
+                <Route path="/videos/:id" element={
+                  <VideoDetail token={token} />
+                } />
+                <Route path="/auth/callback" element={
+                  <AuthCallback setToken={handleLogin} />
+                } />
                 <Route path="*" element={<Navigate to="/" />} />
               </>
             ) : (
@@ -166,6 +182,15 @@ const App = () => {
                     <Register />
                     <Login setToken={handleLogin} />
                   </>
+                } />
+                <Route path="/videos" element={
+                  <VideoList token={null} />
+                } />
+                <Route path="/videos/:id" element={
+                  <VideoDetail token={null} />
+                } />
+                <Route path="/auth/callback" element={
+                  <AuthCallback setToken={handleLogin} />
                 } />
                 <Route path="*" element={<Navigate to="/" />} />
               </>

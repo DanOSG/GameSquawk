@@ -7,6 +7,7 @@ const { setupAssociations } = require('./models/Post');
 const authRoutes = require('./routes/authRoutes');
 const postRoutes = require('./routes/postRoutes');
 const userRoutes = require('./routes/userRoutes');
+const videoRoutes = require('./routes/videoRoutes');
 const path = require('path');
 const fs = require('fs');
 const session = require('express-session');
@@ -77,9 +78,21 @@ app.use((req, res, next) => {
 // Setup model associations
 setupAssociations();
 
+// Import and setup Video associations
+const { setupAssociations: setupVideoAssociations } = require('./models/Video');
+setupVideoAssociations();
+
+// Use temporary directory for video uploads
+const tempDir = path.join(__dirname, 'temp');
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir, { recursive: true });
+  console.log('Created temp directory for video uploads:', tempDir);
+}
+
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/videos', videoRoutes);
 
 const PORT = process.env.PORT || 3001;
 
