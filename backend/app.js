@@ -82,6 +82,10 @@ setupAssociations();
 const { setupAssociations: setupVideoAssociations } = require('./models/Video');
 setupVideoAssociations();
 
+// Import and setup VideoComment associations
+const { setupAssociations: setupVideoCommentAssociations } = require('./models/VideoComment');
+setupVideoCommentAssociations();
+
 // Use temporary directory for video uploads
 const tempDir = path.join(__dirname, 'temp');
 if (!fs.existsSync(tempDir)) {

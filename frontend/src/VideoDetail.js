@@ -156,7 +156,7 @@ const VideoDetail = ({ token }) => {
       <div className="video-player-container">
         <div className="video-player">
           <iframe
-            src={video.webViewLink}
+            src={video.embedLink || `https://drive.google.com/file/d/${video.fileId}/preview`}
             title={video.title}
             allowFullScreen
             allow="autoplay"

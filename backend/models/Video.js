@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/config');
 const User = require('./User');
-const Comment = require('./Comment');
+const VideoComment = require('./VideoComment');
 
 const Video = sequelize.define('Video', {
   id: {
@@ -30,6 +30,10 @@ const Video = sequelize.define('Video', {
     allowNull: true
   },
   thumbnailLink: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  embedLink: {
     type: DataTypes.STRING,
     allowNull: true
   },
@@ -64,7 +68,7 @@ const setupAssociations = () => {
   });
 
   // Video has many Comments
-  Video.hasMany(Comment, {
+  Video.hasMany(VideoComment, {
     foreignKey: 'videoId',
     as: 'comments',
     onDelete: 'CASCADE'
@@ -82,22 +86,28 @@ const setupAssociations = () => {
       allowNull: false,
       defaultValue: true // true for like, false for dislike
     }
+  }, {
+    underscored: true // This will use snake_case for foreign keys
   });
 
   // Association for VideoLike
   Video.hasMany(VideoLike, {
-    foreignKey: 'videoId',
+    foreignKey: 'video_id',
     as: 'reactions',
     onDelete: 'CASCADE'
   });
 
   User.hasMany(VideoLike, {
-    foreignKey: 'userId',
+    foreignKey: 'user_id',
     onDelete: 'CASCADE'
   });
 
-  VideoLike.belongsTo(Video);
-  VideoLike.belongsTo(User);
+  VideoLike.belongsTo(Video, {
+    foreignKey: 'video_id'
+  });
+  VideoLike.belongsTo(User, {
+    foreignKey: 'user_id'
+  });
 
   // Make VideoLike available
   Video.VideoLike = VideoLike;

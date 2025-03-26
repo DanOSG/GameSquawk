@@ -46,10 +46,16 @@ class GoogleDriveService {
         fields: 'id, name, webViewLink, webContentLink, thumbnailLink, createdTime'
       });
 
+      // Make sure the file is publicly accessible
       await this.makeFilePublic(response.data.id);
       
       // Get the updated file with public links
       const file = await this.getFileInfo(response.data.id);
+      
+      // Create a direct embed link
+      const embedLink = `https://drive.google.com/file/d/${file.id}/preview`;
+      file.embedLink = embedLink;
+      
       return file;
     } catch (error) {
       console.error('Error uploading video to Google Drive:', error);
@@ -59,14 +65,26 @@ class GoogleDriveService {
 
   async makeFilePublic(fileId) {
     try {
+      // First, set the file to be publicly accessible
       await this.driveClient.permissions.create({
         fileId: fileId,
         requestBody: {
           role: 'reader',
           type: 'anyone'
+        },
+        fields: 'id'
+      });
+      
+      // Then, update the file to allow embedding
+      await this.driveClient.files.update({
+        fileId: fileId,
+        requestBody: {
+          // This ensures the file can be embedded
+          copyRequiresWriterPermission: false
         }
       });
-      console.log(`File ${fileId} is now public`);
+      
+      console.log(`File ${fileId} is now public and embeddable`);
     } catch (error) {
       console.error('Error making file public:', error);
       throw error;
@@ -77,8 +95,14 @@ class GoogleDriveService {
     try {
       const response = await this.driveClient.files.get({
         fileId: fileId,
-        fields: 'id, name, description, webViewLink, webContentLink, thumbnailLink, createdTime, mimeType, size'
+        fields: 'id, name, description, webViewLink, webContentLink, thumbnailLink, createdTime, mimeType, size',
+        // Include auth token in URL to ensure accessibility
+        supportsAllDrives: true
       });
+      
+      // Add direct embed link
+      response.data.embedLink = `https://drive.google.com/file/d/${fileId}/preview`;
+      
       return response.data;
     } catch (error) {
       console.error('Error getting file info:', error);
@@ -91,8 +115,16 @@ class GoogleDriveService {
       const response = await this.driveClient.files.list({
         q: `'${FOLDER_ID}' in parents and trashed = false`,
         fields: 'files(id, name, description, webViewLink, webContentLink, thumbnailLink, createdTime, mimeType, size)',
-        orderBy: 'createdTime desc'
+        orderBy: 'createdTime desc',
+        supportsAllDrives: true
       });
+      
+      // Add embed links to all files
+      response.data.files = response.data.files.map(file => {
+        file.embedLink = `https://drive.google.com/file/d/${file.id}/preview`;
+        return file;
+      });
+      
       return response.data.files;
     } catch (error) {
       console.error('Error listing files:', error);

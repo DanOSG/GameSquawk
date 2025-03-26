@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const Video = require('../models/Video');
 const User = require('../models/User');
-const Comment = require('../models/Comment');
+const VideoComment = require('../models/VideoComment');
 const googleDriveService = require('../services/googleDriveService');
 const { Op } = require('sequelize');
 
@@ -41,6 +41,7 @@ exports.uploadVideo = async (req, res) => {
       webViewLink: uploadedFile.webViewLink,
       webContentLink: uploadedFile.webContentLink,
       thumbnailLink: uploadedFile.thumbnailLink,
+      embedLink: uploadedFile.embedLink,
       mimeType: uploadedFile.mimeType,
       size: uploadedFile.size
     });
@@ -120,7 +121,7 @@ exports.getVideo = async (req, res) => {
           attributes: ['id', 'username', 'avatar']
         },
         {
-          model: Comment,
+          model: VideoComment,
           as: 'comments',
           include: {
             model: User,
@@ -243,14 +244,14 @@ exports.addComment = async (req, res) => {
       return res.status(404).json({ message: 'Video not found' });
     }
 
-    const comment = await Comment.create({
+    const comment = await VideoComment.create({
       content,
       userId,
       videoId: id
     });
 
     // Include user data in response
-    const commentWithUser = await Comment.findByPk(comment.id, {
+    const commentWithUser = await VideoComment.findByPk(comment.id, {
       include: {
         model: User,
         attributes: ['id', 'username', 'avatar']
