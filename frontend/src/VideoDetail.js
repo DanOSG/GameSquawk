@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
   FiThumbsUp, FiThumbsDown, FiEye, FiCalendar, 
-  FiUser, FiSend, FiTrash2, FiArrowLeft 
+  FiUser, FiSend, FiTrash2, FiArrowLeft, FiPlay
 } from 'react-icons/fi';
 import './VideoDetail.css';
 
@@ -19,6 +19,8 @@ const VideoDetail = ({ token }) => {
   const [commenting, setCommenting] = useState(false);
   const [userReaction, setUserReaction] = useState(null); // 'like', 'dislike', or null
   const [userId, setUserId] = useState(null);
+  const [showVideo, setShowVideo] = useState(false);
+  const [statusCheckInterval, setStatusCheckInterval] = useState(null);
 
   useEffect(() => {
     // Extract user ID from token if available
@@ -32,6 +34,13 @@ const VideoDetail = ({ token }) => {
     }
     
     fetchVideo();
+
+    // Cleanup function
+    return () => {
+      if (statusCheckInterval) {
+        clearInterval(statusCheckInterval);
+      }
+    };
   }, [id, token]);
 
   const fetchVideo = async () => {
@@ -39,12 +48,68 @@ const VideoDetail = ({ token }) => {
       setLoading(true);
       const response = await axios.get(`${API_URL}/api/videos/${id}`);
       setVideo(response.data);
+      
+      // Start polling for video status if it's processing
+      if (response.data.status === 'processing') {
+        startStatusChecking();
+      }
+      
+      // Check if user has already reacted to this video
+      if (token) {
+        try {
+          const userReactionsResponse = await axios.get(
+            `${API_URL}/api/videos/${id}/reactions/me`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
+            }
+          );
+          
+          if (userReactionsResponse.data.reaction) {
+            setUserReaction(userReactionsResponse.data.reaction.isLike ? 'like' : 'dislike');
+          }
+        } catch (error) {
+          console.error('Error checking user reactions:', error);
+        }
+      }
+      
       setLoading(false);
     } catch (err) {
       setError('Error loading video. It may have been removed or is unavailable.');
       setLoading(false);
       console.error('Error fetching video:', err);
     }
+  };
+
+  const startStatusChecking = () => {
+    // Clear any existing interval
+    if (statusCheckInterval) {
+      clearInterval(statusCheckInterval);
+    }
+    
+    // Set up new interval to check status every 5 seconds
+    const interval = setInterval(async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/videos/${id}/status`);
+        
+        if (response.data.isReady) {
+          // Video is ready, update and stop checking
+          clearInterval(interval);
+          setStatusCheckInterval(null);
+          
+          // Refresh the video data
+          fetchVideo();
+        }
+      } catch (error) {
+        console.error('Error checking video status:', error);
+        // Stop checking on error
+        clearInterval(interval);
+        setStatusCheckInterval(null);
+      }
+    }, 5000); // Check every 5 seconds
+    
+    setStatusCheckInterval(interval);
   };
 
   const handleReaction = async (type) => {
@@ -155,13 +220,64 @@ const VideoDetail = ({ token }) => {
     <div className="video-detail-container">
       <div className="video-player-container">
         <div className="video-player">
-          <iframe
-            src={video.embedLink || `https://drive.google.com/file/d/${video.fileId}/preview`}
-            title={video.title}
-            allowFullScreen
-            allow="autoplay"
-            className="video-iframe"
-          ></iframe>
+          {showVideo ? (
+            <iframe
+              src={video.embedLink || `https://drive.google.com/file/d/${video.fileId}/preview`}
+              title={video.title}
+              allowFullScreen
+              allow="autoplay"
+              className="video-iframe"
+            ></iframe>
+          ) : (
+            <>
+              <div 
+                className="thumbnail-preview"
+                onClick={() => setShowVideo(true)}
+              >
+                {video.thumbnailLink ? (
+                  <>
+                    <img 
+                      src={video.thumbnailLink.replace('w320-h180', 'w1280-h720')} 
+                      alt={video.title}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                    {video.status === 'processing' && (
+                      <div className="processing-overlay">
+                        <div className="processing-message">
+                          <div className="processing-spinner"></div>
+                          <span>Video is processing...</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="placeholder-thumbnail">
+                    <span>{video.title.charAt(0).toUpperCase()}</span>
+                    {video.status === 'processing' && (
+                      <div className="processing-message">
+                        <div className="processing-spinner"></div>
+                        <span>Video is processing...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {video.status !== 'processing' && (
+                  <div className="play-button">
+                    <FiPlay />
+                  </div>
+                )}
+              </div>
+              <iframe
+                style={{ display: 'none' }}
+                src="about:blank"
+                title="placeholder"
+                className="video-iframe"
+              ></iframe>
+            </>
+          )}
         </div>
       </div>
       
@@ -198,7 +314,7 @@ const VideoDetail = ({ token }) => {
                 <span>{video.dislikeCount}</span>
               </button>
               
-              {userId && video.uploader.id === userId && (
+              {userId && video.uploader && video.uploader.id === userId && (
                 <button 
                   className="delete-button"
                   onClick={handleDeleteVideo}
@@ -212,20 +328,22 @@ const VideoDetail = ({ token }) => {
         </div>
         
         <div className="video-uploader">
-          <Link to={`/profile/${video.uploader.id}`} className="uploader-info">
-            {video.uploader.avatar ? (
-              <img
-                src={`${API_URL}${video.uploader.avatar}`}
-                alt={video.uploader.username}
-                className="uploader-avatar"
-              />
-            ) : (
-              <div className="uploader-placeholder">
-                {video.uploader.username.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <span className="uploader-name">{video.uploader.username}</span>
-          </Link>
+          {video.uploader && (
+            <Link to={`/profile/${video.uploader.id}`} className="uploader-info">
+              {video.uploader.avatar ? (
+                <img
+                  src={`${API_URL}${video.uploader.avatar}`}
+                  alt={video.uploader.username}
+                  className="uploader-avatar"
+                />
+              ) : (
+                <div className="uploader-placeholder">
+                  {video.uploader.username.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="uploader-name">{video.uploader.username}</span>
+            </Link>
+          )}
         </div>
         
         {video.description && (
@@ -272,14 +390,14 @@ const VideoDetail = ({ token }) => {
               video.comments.map(comment => (
                 <div key={comment.id} className="comment">
                   <Link to={`/profile/${comment.userId}`} className="comment-avatar">
-                    {comment.User.avatar ? (
+                    {comment.User && comment.User.avatar ? (
                       <img
                         src={`${API_URL}${comment.User.avatar}`}
                         alt={comment.User.username}
                       />
                     ) : (
                       <div className="comment-avatar-placeholder">
-                        {comment.User.username.charAt(0).toUpperCase()}
+                        {comment.User && comment.User.username ? comment.User.username.charAt(0).toUpperCase() : '?'}
                       </div>
                     )}
                   </Link>
@@ -287,7 +405,7 @@ const VideoDetail = ({ token }) => {
                   <div className="comment-content">
                     <div className="comment-header">
                       <Link to={`/profile/${comment.userId}`} className="comment-username">
-                        {comment.User.username}
+                        {comment.User && comment.User.username ? comment.User.username : 'Unknown User'}
                       </Link>
                       <span className="comment-date">
                         {formatDate(comment.createdAt)}
@@ -309,4 +427,4 @@ const VideoDetail = ({ token }) => {
   );
 };
 
-export default VideoDetail; 
+export default VideoDetail;

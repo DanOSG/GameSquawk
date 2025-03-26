@@ -9,53 +9,69 @@ const { Op } = require('sequelize');
 // Upload a video
 exports.uploadVideo = async (req, res) => {
   try {
+    // Check if a video file was uploaded
     if (!req.file) {
       return res.status(400).json({ message: 'No video file provided' });
     }
 
-    const { title, description } = req.body;
-    const userId = req.user.id;
-    
-    // Check if title is provided
-    if (!title) {
+    // Check for title
+    if (!req.body.title) {
       return res.status(400).json({ message: 'Video title is required' });
     }
 
-    // Upload to Google Drive
-    const filePath = req.file.path;
-    const mimeType = req.file.mimetype;
-    
+    // Upload to Google Drive using the service
     const uploadedFile = await googleDriveService.uploadVideo(
-      filePath, 
-      mimeType, 
-      title, 
-      description
+      req.file.path,
+      req.file.mimetype,
+      req.body.title,
+      req.body.description || ''
     );
 
-    // Create video record in database
+    // Create a record in the database
     const video = await Video.create({
-      title,
-      description,
-      userId,
+      title: req.body.title,
+      description: req.body.description || '',
       fileId: uploadedFile.id,
       webViewLink: uploadedFile.webViewLink,
       webContentLink: uploadedFile.webContentLink,
       thumbnailLink: uploadedFile.thumbnailLink,
       embedLink: uploadedFile.embedLink,
+      userId: req.user.id,
+      status: 'processing', // Set initial status to processing
       mimeType: uploadedFile.mimeType,
       size: uploadedFile.size
     });
 
-    // Clean up temporary file
-    fs.unlinkSync(filePath);
+    // Clean up the temporary file
+    fs.unlinkSync(req.file.path);
 
-    res.status(201).json({ 
-      message: 'Video uploaded successfully',
-      video
+    // Simulate processing delay - after 30 seconds, set status to 'ready'
+    setTimeout(async () => {
+      try {
+        await Video.update(
+          { status: 'ready' },
+          { where: { id: video.id } }
+        );
+        console.log(`Video ${video.id} processing completed`);
+      } catch (error) {
+        console.error(`Error updating video ${video.id} status:`, error);
+      }
+    }, 30000); // 30 seconds processing time
+
+    // Return success response with processing status
+    res.status(201).json({
+      message: 'Video is being processed and will be available shortly',
+      video: {
+        id: video.id,
+        title: video.title,
+        description: video.description,
+        status: video.status,
+        fileId: video.fileId
+      }
     });
   } catch (error) {
     console.error('Error uploading video:', error);
-    res.status(500).json({ message: 'Error uploading video', error: error.message });
+    res.status(500).json({ message: 'Failed to upload video', error: error.message });
   }
 };
 
@@ -166,8 +182,8 @@ exports.reactToVideo = async (req, res) => {
     const VideoLike = Video.VideoLike;
     const existingReaction = await VideoLike.findOne({
       where: {
-        videoId: id,
-        userId
+        video_id: id,
+        user_id: userId
       }
     });
 
@@ -207,8 +223,8 @@ exports.reactToVideo = async (req, res) => {
     } else {
       // Create new reaction
       await VideoLike.create({
-        videoId: id,
-        userId,
+        video_id: id,
+        user_id: userId,
         isLike
       });
       
@@ -225,6 +241,33 @@ exports.reactToVideo = async (req, res) => {
   } catch (error) {
     console.error('Error reacting to video:', error);
     res.status(500).json({ message: 'Error reacting to video', error: error.message });
+  }
+};
+
+// Get the current user's reaction to a video
+exports.getUserReaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const video = await Video.findByPk(id);
+    if (!video) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+
+    // Check if user already reacted to this video
+    const VideoLike = Video.VideoLike;
+    const reaction = await VideoLike.findOne({
+      where: {
+        video_id: id,
+        user_id: userId
+      }
+    });
+
+    res.json({ reaction });
+  } catch (error) {
+    console.error('Error getting user reaction:', error);
+    res.status(500).json({ message: 'Error getting user reaction', error: error.message });
   }
 };
 
@@ -291,5 +334,32 @@ exports.deleteVideo = async (req, res) => {
   } catch (error) {
     console.error('Error deleting video:', error);
     res.status(500).json({ message: 'Error deleting video', error: error.message });
+  }
+};
+
+// Check video processing status
+exports.checkVideoStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find the video by ID
+    const video = await Video.findByPk(id, {
+      attributes: ['id', 'status', 'title']
+    });
+    
+    if (!video) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+    
+    // Return the video status
+    res.status(200).json({
+      id: video.id,
+      status: video.status,
+      isReady: video.status === 'ready',
+      title: video.title
+    });
+  } catch (error) {
+    console.error('Error checking video status:', error);
+    res.status(500).json({ message: 'Error checking video status', error: error.message });
   }
 }; 

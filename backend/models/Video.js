@@ -37,6 +37,11 @@ const Video = sequelize.define('Video', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  status: {
+    type: DataTypes.ENUM('processing', 'ready'),
+    defaultValue: 'processing',
+    allowNull: false
+  },
   mimeType: {
     type: DataTypes.STRING,
     allowNull: true

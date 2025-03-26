@@ -50,6 +50,12 @@ router.get('/', videoController.getVideos);
 // Get a single video (public)
 router.get('/:id', videoController.getVideo);
 
+// Get video processing status (public)
+router.get('/:id/status', videoController.checkVideoStatus);
+
+// Get current user's reaction to a video
+router.get('/:id/reactions/me', auth, videoController.getUserReaction);
+
 // Protected routes below require authentication
 // Upload a video
 router.post('/', auth, upload.single('video'), videoController.uploadVideo);

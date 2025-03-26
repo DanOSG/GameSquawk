@@ -3,11 +3,13 @@ const User = require('../models/User');
 
 exports.createPost = async (req, res) => {
   try {
-    const { title, content, category } = req.body;
+    const { title, content, gameId, gameTitle, gameImage } = req.body;
     const post = await Post.create({
       title,
       content,
-      category,
+      gameId,
+      gameTitle,
+      gameImage,
       userId: req.user.id
     });
     
@@ -32,7 +34,7 @@ exports.createPost = async (req, res) => {
 exports.updatePost = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, content, category } = req.body;
+    const { title, content, gameId, gameTitle, gameImage } = req.body;
     const post = await Post.findByPk(id);
     
     if (!post) {
@@ -40,7 +42,13 @@ exports.updatePost = async (req, res) => {
     }
     
     if (post.userId === req.user.id) {
-      await post.update({ title, content, category });
+      await post.update({ 
+        title, 
+        content, 
+        gameId, 
+        gameTitle, 
+        gameImage 
+      });
 
       // Fetch the updated post with user information
       const updatedPost = await Post.findByPk(id, {
@@ -97,8 +105,8 @@ exports.deletePost = async (req, res) => {
 
 exports.getPosts = async (req, res) => {
   try {
-    const { category } = req.query;
-    const where = category ? { category } : {};
+    const { gameId } = req.query;
+    const where = gameId ? { gameId } : {};
     const posts = await Post.findAll({
       where,
       include: [{

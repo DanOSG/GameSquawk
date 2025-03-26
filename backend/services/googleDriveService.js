@@ -56,6 +56,10 @@ class GoogleDriveService {
       const embedLink = `https://drive.google.com/file/d/${file.id}/preview`;
       file.embedLink = embedLink;
       
+      // Create a custom thumbnail URL using Google Drive's thumbnail format
+      // This works better than the default thumbnailLink from the API
+      file.thumbnailLink = `https://drive.google.com/thumbnail?id=${file.id}&sz=w320-h180-n`;
+      
       return file;
     } catch (error) {
       console.error('Error uploading video to Google Drive:', error);
@@ -103,6 +107,9 @@ class GoogleDriveService {
       // Add direct embed link
       response.data.embedLink = `https://drive.google.com/file/d/${fileId}/preview`;
       
+      // Add custom thumbnail URL
+      response.data.thumbnailLink = `https://drive.google.com/thumbnail?id=${fileId}&sz=w320-h180-n`;
+      
       return response.data;
     } catch (error) {
       console.error('Error getting file info:', error);
@@ -119,9 +126,10 @@ class GoogleDriveService {
         supportsAllDrives: true
       });
       
-      // Add embed links to all files
+      // Add embed links and custom thumbnails to all files
       response.data.files = response.data.files.map(file => {
         file.embedLink = `https://drive.google.com/file/d/${file.id}/preview`;
+        file.thumbnailLink = `https://drive.google.com/thumbnail?id=${file.id}&sz=w320-h180-n`;
         return file;
       });
       

@@ -9,10 +9,22 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 const VideoList = ({ token }) => {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState('');
+  const [processingVideos, setProcessingVideos] = useState(new Set());
+  const [statusCheckInterval, setStatusCheckInterval] = useState(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    fetchVideos();
+
+    return () => {
+      if (statusCheckInterval) {
+        clearInterval(statusCheckInterval);
+      }
+    };
+  }, []);
 
   const fetchVideos = async (pageNum = 1, search = '') => {
     try {
@@ -32,6 +44,22 @@ const VideoList = ({ token }) => {
       }
 
       setHasMore(response.data.pagination.hasMore);
+      
+      // Check for any processing videos - ensure we're using the status field directly
+      const processing = new Set();
+      response.data.videos.forEach(video => {
+        if (video.status === 'processing') {
+          processing.add(video.id);
+        }
+      });
+      
+      setProcessingVideos(processing);
+      
+      // If there are processing videos, set up status checking
+      if (processing.size > 0) {
+        startStatusChecking(processing);
+      }
+      
       setLoading(false);
     } catch (err) {
       setError('Failed to load videos. Please try again later.');
@@ -40,6 +68,50 @@ const VideoList = ({ token }) => {
     }
   };
 
+  const startStatusChecking = (videoIds) => {
+    // Clear any existing interval
+    if (statusCheckInterval) {
+      clearInterval(statusCheckInterval);
+    }
+    
+    // Set up new interval to check status every 10 seconds
+    const interval = setInterval(async () => {
+      let foundReady = false;
+      
+      for (const videoId of videoIds) {
+        try {
+          const response = await axios.get(`${API_URL}/api/videos/${videoId}/status`);
+          
+          if (response.data.isReady) {
+            // Mark this video as ready
+            setProcessingVideos(prev => {
+              const updated = new Set(prev);
+              updated.delete(videoId);
+              return updated;
+            });
+            foundReady = true;
+          }
+        } catch (error) {
+          console.error(`Error checking video ${videoId} status:`, error);
+        }
+      }
+      
+      if (foundReady) {
+        // Refresh the videos list if any video became ready
+        fetchVideos(page, searchTerm);
+      }
+      
+      // If no more processing videos, clear the interval
+      if (processingVideos.size === 0) {
+        clearInterval(interval);
+        setStatusCheckInterval(null);
+      }
+    }, 10000); // Check every 10 seconds
+    
+    setStatusCheckInterval(interval);
+  };
+
+  // Effect for search term changes
   useEffect(() => {
     fetchVideos(1, searchTerm);
   }, [searchTerm]);
@@ -109,9 +181,32 @@ const VideoList = ({ token }) => {
               <Link to={`/videos/${video.id}`}>
                 <div className="video-thumbnail">
                   {video.thumbnailLink ? (
-                    <img src={video.thumbnailLink} alt={video.title} />
+                    <>
+                      <img 
+                        src={video.thumbnailLink} 
+                        alt={video.title} 
+                        onError={(e) => {
+                          // Fallback if the thumbnail fails to load
+                          e.target.onerror = null;
+                          e.target.style.display = 'none';
+                          e.target.parentNode.querySelector('.placeholder-thumbnail').style.display = 'flex';
+                        }} 
+                      />
+                      {video.status === 'processing' && (
+                        <div className="processing-badge">Processing</div>
+                      )}
+                    </>
                   ) : (
                     <div className="placeholder-thumbnail">
+                      <span>{video.title.charAt(0).toUpperCase()}</span>
+                      {video.status === 'processing' && (
+                        <div className="processing-badge">Processing</div>
+                      )}
+                    </div>
+                  )}
+                  {/* Always include placeholder as fallback, but initially hidden */}
+                  {video.thumbnailLink && (
+                    <div className="placeholder-thumbnail" style={{ display: 'none' }}>
                       <span>{video.title.charAt(0).toUpperCase()}</span>
                     </div>
                   )}

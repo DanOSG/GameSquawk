@@ -29,6 +29,9 @@ const PostList = ({ token, onDeletePost }) => {
   const [showComments, setShowComments] = useState({});
   const [newComment, setNewComment] = useState({});
   const [userAvatars, setUserAvatars] = useState({});
+  const [games, setGames] = useState({});
+  const [hoveredGame, setHoveredGame] = useState(null);
+  const RAWG_API_KEY = process.env.REACT_APP_RAWG_API_KEY;
 
   // Move API calls to useCallback hooks
   const fetchLikeStatus = useCallback(async (postId) => {
@@ -122,7 +125,7 @@ const PostList = ({ token, onDeletePost }) => {
     try {
       console.log('Fetching posts with token:', token);
       const response = await axios.get(
-        `${API_URL}/api/posts${selectedCategory ? `?category=${selectedCategory}` : ''}`,
+        `${API_URL}/api/posts${selectedCategory ? `?gameId=${selectedCategory}` : ''}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -150,6 +153,58 @@ const PostList = ({ token, onDeletePost }) => {
       }
     }
   }, [token, selectedCategory, fetchLikeStatus, fetchComments, fetchUserAvatar, userAvatars]);
+
+  // Function to fetch game details if not cached
+  const fetchGameDetails = useCallback(async (gameId) => {
+    if (!gameId || games[gameId]) return;
+    
+    try {
+      const response = await axios.get(`https://api.rawg.io/api/games/${gameId}`, {
+        params: {
+          key: RAWG_API_KEY
+        }
+      });
+      
+      setGames(prev => ({
+        ...prev,
+        [gameId]: {
+          name: response.data.name,
+          image: response.data.background_image
+        }
+      }));
+    } catch (error) {
+      console.error(`Error fetching game details for game ${gameId}:`, error);
+      // Set empty object on error to prevent continuous retries
+      setGames(prev => ({
+        ...prev,
+        [gameId]: { name: 'Unknown Game', image: null }
+      }));
+    }
+  }, [games, RAWG_API_KEY]);
+
+  useEffect(() => {
+    // Fetch game details for all posts when component mounts
+    if (posts.length > 0) {
+      posts.forEach(post => {
+        if (post.gameId && !games[post.gameId]) {
+          fetchGameDetails(post.gameId);
+        }
+      });
+    }
+  }, [posts, games, fetchGameDetails]);
+
+  const handleMouseEnter = (gameId) => {
+    if (gameId) {
+      setHoveredGame(gameId);
+      if (!games[gameId]) {
+        fetchGameDetails(gameId);
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredGame(null);
+  };
 
   // Update useEffect hooks with proper dependencies
   useEffect(() => {
@@ -316,7 +371,7 @@ const PostList = ({ token, onDeletePost }) => {
   };
 
   return (
-    <div>
+    <div className="post-list">
       <div className="category-filter">
         <select 
           value={selectedCategory} 
@@ -324,9 +379,13 @@ const PostList = ({ token, onDeletePost }) => {
           className="category-dropdown"
         >
           <option value="">All Posts</option>
-          {CATEGORIES.map(category => (
-            <option key={category} value={category}>{category}</option>
-          ))}
+          {/* We'll fetch unique games from posts */}
+          {Array.from(new Set(posts.map(post => post.gameId))).map(gameId => {
+            const game = games[gameId] || { name: 'Loading...' };
+            return gameId ? (
+              <option key={gameId} value={gameId}>{game.name}</option>
+            ) : null;
+          }).filter(Boolean)}
         </select>
       </div>
       <div className="posts-container">
@@ -358,15 +417,10 @@ const PostList = ({ token, onDeletePost }) => {
                     </div>
                   </div>
                 </div>
-                <select
-                  value={editingPost.category}
-                  onChange={(e) => handleInputChange(e, 'category')}
-                  className="category-dropdown"
-                >
-                  {CATEGORIES.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
+                <div className="game-selection">
+                  <p>Game: {games[editingPost.gameId]?.name || 'Loading...'}</p>
+                  {/* If we want to allow changing the game, we would need to add a game search here */}
+                </div>
                 <div className="edit-controls">
                   <button onClick={() => handleSaveEdit(editingPost)} className="save-button">
                     <FiSave /> Save Changes
@@ -380,9 +434,27 @@ const PostList = ({ token, onDeletePost }) => {
               <>
                 <h2>{post.title}</h2>
                 <div className="post-meta">
-                  <p className="post-category">
-                    <BiCategory /> {post.category}
-                  </p>
+                  {post.gameId && (
+                    <div className="post-category" 
+                      onMouseEnter={() => handleMouseEnter(post.gameId)}
+                      onMouseLeave={handleMouseLeave}
+                    >
+                      <BiCategory /> 
+                      <span className="game-category">
+                        {games[post.gameId]?.name || post.gameTitle || 'Loading...'}
+                      </span>
+                      {hoveredGame === post.gameId && games[post.gameId]?.image && (
+                        <div className="game-tooltip">
+                          <img 
+                            src={games[post.gameId].image} 
+                            alt={games[post.gameId].name}
+                            className="game-tooltip-image" 
+                          />
+                          <div className="game-tooltip-title">{games[post.gameId].name}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <Link to={`/profile/${post.userId}`} className="post-author">
                     {userAvatars[post.userId] ? (
                       <img 

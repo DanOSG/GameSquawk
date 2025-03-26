@@ -12,9 +12,17 @@ const Post = sequelize.define('Post', {
     type: DataTypes.TEXT,
     allowNull: false
   },
-  category: {
+  gameId: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true
+  },
+  gameTitle: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  gameImage: {
+    type: DataTypes.STRING,
+    allowNull: true
   },
   userId: {
     type: DataTypes.INTEGER,
