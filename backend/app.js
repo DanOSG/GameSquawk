@@ -8,6 +8,7 @@ const authRoutes = require('./routes/authRoutes');
 const postRoutes = require('./routes/postRoutes');
 const userRoutes = require('./routes/userRoutes');
 const videoRoutes = require('./routes/videoRoutes');
+const { initLobbyService } = require('./services/lobbyService');
 const path = require('path');
 const fs = require('fs');
 const session = require('express-session');
@@ -20,9 +21,13 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST", "PUT", "DELETE"]
-  }
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']
+  },
+  // For WebRTC, ensure transports are configured properly
+  transports: ['websocket', 'polling']
 });
 
 app.use(cors({
@@ -68,6 +73,9 @@ io.on('connection', (socket) => {
     console.log('User disconnected');
   });
 });
+
+// Initialize the Lobby service for voice chat
+initLobbyService(io);
 
 // Make io accessible to our router
 app.use((req, res, next) => {

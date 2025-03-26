@@ -11,6 +11,7 @@ import VideoList from './VideoList';
 import VideoUpload from './VideoUpload';
 import VideoDetail from './VideoDetail';
 import Sidebar from './components/Sidebar';
+import Lobby from './components/Lobby';
 import { FiMenu } from 'react-icons/fi';
 import AuthCallback from './AuthCallback';
 
@@ -66,8 +67,8 @@ const App = () => {
     localStorage.removeItem('username');
     setToken(null);
     setUsername(null);
-    setUserAvatar(null);
     setIsSidebarOpen(false);
+    setUserAvatar(null);
   };
 
   const toggleSidebar = () => {
@@ -169,6 +170,9 @@ const App = () => {
                 } />
                 <Route path="/videos/:id" element={
                   <VideoDetail token={token} />
+                } />
+                <Route path="/lobby" element={
+                  <Lobby token={token} username={username} userAvatar={userAvatar} />
                 } />
                 <Route path="/auth/callback" element={
                   <AuthCallback setToken={handleLogin} />
