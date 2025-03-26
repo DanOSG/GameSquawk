@@ -31,9 +31,21 @@ exports.updateProfile = async (req, res) => {
     if (bio !== undefined) user.bio = bio;
     if (favoriteGames) {
       try {
-        user.favoriteGames = typeof favoriteGames === 'string' 
+        // Ensure favoriteGames is properly formatted and contains all required fields
+        const games = typeof favoriteGames === 'string' 
           ? JSON.parse(favoriteGames) 
           : favoriteGames;
+        
+        // Validate each game has at least the title field
+        const validGames = games.map(game => ({
+          id: game.id || null,
+          title: game.title || game.name || 'Unknown Game',
+          platform: game.platform || 'Unknown',
+          background_image: game.background_image || null,
+          rating: game.rating || null
+        }));
+        
+        user.favoriteGames = validGames;
       } catch (e) {
         return res.status(400).json({ message: 'Invalid favoriteGames format' });
       }
