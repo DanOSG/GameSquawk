@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FiMic, FiMicOff, FiUser, FiVolume2 } from 'react-icons/fi';
+import { FiMic, FiMicOff, FiUser, FiVolume2, FiMessageCircle, FiSend } from 'react-icons/fi';
 import io from 'socket.io-client';
 import '../LobbyStyles.css';
 import VolumeMeter from './VolumeMeter';
@@ -20,6 +20,10 @@ const Lobby = ({ token, username, userAvatar }) => {
   const audioGainNode = useRef(null);
   const [localVolume, setLocalVolume] = useState(0);
   const [userVolumes, setUserVolumes] = useState({});
+  const [chatMessages, setChatMessages] = useState([]);
+  const [messageInput, setMessageInput] = useState('');
+  const chatRef = useRef(null);
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
 
   // Connect to socket and set up WebRTC when component mounts
   useEffect(() => {
@@ -39,6 +43,7 @@ const Lobby = ({ token, username, userAvatar }) => {
     // Set up socket event listeners
     socketRef.current.on('connect', () => {
       console.log('Connected to lobby with socket ID:', socketRef.current.id);
+      setConnectionStatus('connected');
       
       // Emit join lobby event
       socketRef.current.emit('joinLobby', {
@@ -50,6 +55,7 @@ const Lobby = ({ token, username, userAvatar }) => {
     // Handle reconnection
     socketRef.current.on('reconnect', (attemptNumber) => {
       console.log(`Reconnected to lobby after ${attemptNumber} attempts`);
+      setConnectionStatus('connected');
       
       // Re-emit join lobby event
       socketRef.current.emit('joinLobby', {
@@ -61,11 +67,19 @@ const Lobby = ({ token, username, userAvatar }) => {
     // Handle connection errors
     socketRef.current.on('connect_error', (error) => {
       console.error('Socket connection error:', error);
+      setConnectionStatus('error');
     });
     
     // Handle disconnection
     socketRef.current.on('disconnect', (reason) => {
       console.log('Disconnected from lobby:', reason);
+      setConnectionStatus('disconnected');
+    });
+
+    // Handle duplicate session
+    socketRef.current.on('duplicateSession', () => {
+      alert('You have another active session open. Please use only one browser tab.');
+      window.location.href = '/';
     });
 
     // Listen for users in the lobby
@@ -164,6 +178,53 @@ const Lobby = ({ token, username, userAvatar }) => {
       }
     });
 
+    // Add chat message handler
+    socketRef.current.on('chatMessage', (message) => {
+      // Don't add duplicate messages from self
+      if (message.sender === username && message.id === Date.now().toString()) return;
+      
+      setChatMessages(prev => [...prev, message]);
+      
+      // Auto-scroll chat to bottom
+      if (chatRef.current) {
+        setTimeout(() => {
+          chatRef.current.scrollTop = chatRef.current.scrollHeight;
+        }, 100);
+      }
+    });
+
+    // Handle chat history when joining
+    socketRef.current.on('chatHistory', (history) => {
+      console.log(`Received chat history with ${history.length} messages`);
+      setChatMessages(history);
+      
+      // Auto-scroll chat to bottom
+      if (chatRef.current) {
+        setTimeout(() => {
+          chatRef.current.scrollTop = chatRef.current.scrollHeight;
+        }, 100);
+      }
+    });
+    
+    // Handle chat cleared event
+    socketRef.current.on('chatCleared', (info) => {
+      console.log('Chat has been cleared:', info);
+      setChatMessages([{
+        id: 'system-message',
+        sender: 'System',
+        text: info.message,
+        timestamp: info.timestamp,
+        isSystemMessage: true
+      }]);
+      
+      // Auto-scroll chat to bottom
+      if (chatRef.current) {
+        setTimeout(() => {
+          chatRef.current.scrollTop = chatRef.current.scrollHeight;
+        }, 100);
+      }
+    });
+
     // Add this handler for debugging connection issues
     window.addEventListener('online', () => {
       console.log('Browser detected network connection restored');
@@ -223,8 +284,9 @@ const Lobby = ({ token, username, userAvatar }) => {
       console.log('Local stream obtained with tracks:', stream.getTracks().map(t => t.kind).join(', '));
       setLocalStream(stream);
       
-      // Mute audio by default
+      // Mute audio by default but make sure tracks exist and are created
       stream.getAudioTracks().forEach(track => {
+        console.log('Setting audio track enabled to false (muted)');
         track.enabled = false;
       });
       
@@ -355,7 +417,8 @@ const Lobby = ({ token, username, userAvatar }) => {
       alert('Could not access your microphone. Please check your permissions and try again.');
     }
   };
-  
+
+  // Create peer connection function - no changes to this part but included for completeness
   const createPeerConnection = (userId) => {
     // First remove any existing connection for this user
     if (peerConnections[userId]) {
@@ -457,11 +520,8 @@ const Lobby = ({ token, username, userAvatar }) => {
             const audioEl = document.createElement('audio');
             audioEl.id = `audio-${userId}`;
             audioEl.autoplay = true;
-            audioEl.controls = true; // For debugging
-            audioEl.style.position = 'absolute';
-            audioEl.style.opacity = '0';
-            audioEl.style.pointerEvents = 'none'; // Prevent interaction
-            audioEl.style.zIndex = '-1'; // Behind everything
+            audioEl.controls = false; // No visible controls in production
+            audioEl.style.display = 'none'; // Hide from view
             audioEl.srcObject = stream;
             audioEl.volume = audioVolume / 100;
             audioEl.muted = false;
@@ -612,18 +672,38 @@ const Lobby = ({ token, username, userAvatar }) => {
     }
   };
 
-  // Toggle mute state
+  // Toggle mute state with improved debugging
   const toggleMute = () => {
     if (localStream) {
+      const audioTracks = localStream.getAudioTracks();
+      
+      // Log the current state for debugging
+      console.log('Audio tracks:', audioTracks);
+      console.log('Current mute state before toggle:', isMuted);
+      
+      // Toggle the mute state
       const newMuteState = !isMuted;
-      localStream.getAudioTracks().forEach(track => {
-        track.enabled = !newMuteState;
-      });
       setIsMuted(newMuteState);
+      
+      // Update the tracks' enabled property
+      audioTracks.forEach(track => {
+        track.enabled = !newMuteState;
+        console.log(`Set audio track ${track.id} enabled to ${!newMuteState}`);
+      });
+      
+      // Log the new state for verification
+      console.log('New mute state after toggle:', newMuteState);
+      
+      // Broadcast mute status to update UI for other users
+      if (socketRef.current) {
+        socketRef.current.emit('speakingUpdate', !newMuteState);
+      }
+    } else {
+      console.warn('Cannot toggle mute: No local stream available');
     }
   };
 
-  // Handle mic volume change - use the Audio API's GainNode directly
+  // Handle mic volume change
   const handleMicVolumeChange = (e) => {
     const newVolume = parseInt(e.target.value);
     setMicVolume(newVolume);
@@ -659,15 +739,6 @@ const Lobby = ({ token, username, userAvatar }) => {
     });
   };
 
-  // Update audio elements when audioVolume changes
-  useEffect(() => {
-    Object.values(audioElements.current).forEach(audio => {
-      if (audio) {
-        audio.volume = audioVolume / 100;
-      }
-    });
-  }, [audioVolume]);
-
   // Set up local volume meter
   useEffect(() => {
     if (!localStream) return;
@@ -702,139 +773,198 @@ const Lobby = ({ token, username, userAvatar }) => {
     };
   }, [localStream]);
 
-  // Fix peer connections state management to avoid race conditions
-  const checkAndRetryConnections = () => {
-    console.log('Checking and retrying peer connections...');
-    
-    // Go through all users who should be connected
-    const otherUsers = users.filter(user => user.id !== socketRef.current?.id);
-    
-    for (const user of otherUsers) {
-      const peerConnection = peerConnections[user.id];
-      
-      if (!peerConnection) {
-        // No connection exists, create one
-        console.log(`No connection exists for ${user.id}, initiating call`);
-        setTimeout(() => callUser(user.id), 500);
-      } else if (peerConnection.connectionState === 'failed' || 
-                 peerConnection.connectionState === 'disconnected' ||
-                 peerConnection.iceConnectionState === 'failed' ||
-                 peerConnection.iceConnectionState === 'disconnected') {
-        // Connection exists but is in a bad state, recreate it
-        console.log(`Connection to ${user.id} is in bad state (${peerConnection.connectionState}/${peerConnection.iceConnectionState}), recreating`);
-        
-        // First update our state, then close the connection
-        const updatedConnections = { ...peerConnections };
-        delete updatedConnections[user.id];
-        setPeerConnections(updatedConnections);
-        
-        // Now close it after the state has been updated
-        try {
-          peerConnection.close();
-        } catch (err) {
-          console.error("Error closing peer connection:", err);
-        }
-        
-        // Call again after a short delay
-        setTimeout(() => callUser(user.id), 1500);
-      }
-    }
-  };
-
-  // Periodically check connections
+  // Periodically check connections and retry failed ones
   useEffect(() => {
     if (!socketRef.current) return;
+    
+    const checkAndRetryConnections = () => {
+      console.log('Checking and retrying peer connections...');
+      
+      // Go through all users who should be connected
+      const otherUsers = users.filter(user => user.id !== socketRef.current?.id);
+      
+      for (const user of otherUsers) {
+        const peerConnection = peerConnections[user.id];
+        
+        if (!peerConnection) {
+          // No connection exists, create one
+          console.log(`No connection exists for ${user.id}, initiating call`);
+          setTimeout(() => callUser(user.id), 500);
+        } else if (peerConnection.connectionState === 'failed' || 
+                   peerConnection.connectionState === 'disconnected' ||
+                   peerConnection.iceConnectionState === 'failed' ||
+                   peerConnection.iceConnectionState === 'disconnected') {
+          // Connection exists but is in a bad state, recreate it
+          console.log(`Connection to ${user.id} is in bad state (${peerConnection.connectionState}/${peerConnection.iceConnectionState}), recreating`);
+          
+          // Close and recreate connection
+          peerConnection.close();
+          setTimeout(() => callUser(user.id), 1000);
+        }
+      }
+    };
     
     const interval = setInterval(checkAndRetryConnections, 10000); // Check every 10 seconds
     
     return () => clearInterval(interval);
   }, [socketRef.current, users, peerConnections]);
 
+  // Send chat message
+  const sendMessage = () => {
+    if (!messageInput.trim() || !socketRef.current) return;
+    
+    const messageId = Date.now().toString();
+    const newMessage = {
+      id: messageId,
+      sender: username,
+      avatar: userAvatar,
+      text: messageInput,
+      timestamp: new Date().toISOString(),
+    };
+    
+    // Add message to local state first to make UI feel responsive
+    setChatMessages(prev => [...prev, newMessage]);
+    
+    // Emit message to server
+    socketRef.current.emit('chatMessage', newMessage);
+    
+    // Clear input
+    setMessageInput('');
+    
+    // Auto-scroll chat to bottom
+    if (chatRef.current) {
+      setTimeout(() => {
+        chatRef.current.scrollTop = chatRef.current.scrollHeight;
+      }, 100);
+    }
+  };
+
+  // Format timestamp
+  const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <div className="lobby-container">
-      <div className="lobby-header">
-        <h1>The Lobby</h1>
-        <p>Voice chat with other members currently online</p>
-      </div>
-      
-      <div className="controls-container">
-        <button 
-          className={`mute-button ${isMuted ? 'muted' : 'unmuted'}`}
-          onClick={toggleMute}
-        >
-          {isMuted ? <FiMicOff /> : <FiMic />}
-          <span>{isMuted ? 'Unmute' : 'Mute'}</span>
-        </button>
-        
-        <div className="volume-controls">
-          <div className="volume-control">
-            <label htmlFor="mic-volume">Mic Volume:</label>
-            <input 
-              type="range" 
-              id="mic-volume" 
-              min="0" 
-              max="200" 
-              value={micVolume} 
+      <div className="users-wrapper">
+        <div className="users-controls">
+          <button
+            className={`mute-button ${isMuted ? 'muted' : 'unmuted'}`}
+            onClick={toggleMute}
+            title={isMuted ? 'Unmute Microphone' : 'Mute Microphone'}
+          >
+            {isMuted ? <FiMicOff /> : <FiMic />}
+          </button>
+          <div className="volume-controls">
+            <label htmlFor="mic-volume">Mic</label>
+            <input
+              id="mic-volume"
+              type="range"
+              min="0"
+              max="100"
+              value={micVolume}
               onChange={handleMicVolumeChange}
-              disabled={isMuted}
             />
-            <span>{micVolume}%</span>
-          </div>
-          
-          <div className="volume-control">
-            <label htmlFor="audio-volume">Audio Volume:</label>
-            <input 
-              type="range" 
-              id="audio-volume" 
-              min="0" 
-              max="200" 
-              value={audioVolume} 
+            <label htmlFor="audio-volume">Audio</label>
+            <input
+              id="audio-volume"
+              type="range"
+              min="0"
+              max="100"
+              value={audioVolume}
               onChange={handleAudioVolumeChange}
             />
-            <span>{audioVolume}%</span>
           </div>
+          <div className="connection-status">
+            Status: <span className={`status-${connectionStatus}`}>{connectionStatus}</span>
+          </div>
+        </div>
+        <div className="users-list">
+          {users.map(user => (
+            <div 
+              key={user.id} 
+              className={`user-card ${user.animationClass} ${user.speaking ? 'speaking' : ''}`}
+            >
+              <div className="avatar-container">
+                <img 
+                  src={user.avatar || '/default-avatar.png'} 
+                  alt={user.username} 
+                  className="user-avatar" 
+                />
+                {user.id === socketRef.current?.id && (
+                  <div className="volume-indicator">
+                    <VolumeMeter volume={localVolume} />
+                  </div>
+                )}
+                {user.id !== socketRef.current?.id && (
+                  <div className="volume-indicator">
+                    <VolumeMeter volume={userVolumes[user.id] || 0} />
+                  </div>
+                )}
+              </div>
+              <div className="user-info">
+                <span className="username">{user.username}</span>
+                <span className="user-status">
+                  {user.id === socketRef.current?.id ? 
+                    (isMuted ? 'Muted' : 'Speaking') : 
+                    (user.speaking ? 'Speaking' : 'Listening')}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
       
-      <div className="users-container">
-        <div className={`user-bubble current-user ${isMuted ? 'muted' : 'speaking'}`}>
-          {userAvatar ? (
-            <img src={userAvatar} alt={username} />
-          ) : (
-            <div className="avatar-placeholder">
-              <FiUser />
-            </div>
-          )}
-          <div className="user-name">{username} (You)</div>
-          {!isMuted && <VolumeMeter volume={localVolume} />}
+      <div className="chat-section">
+        <div className="chat-header">
+          <h3>Lobby Chat</h3>
         </div>
-        
-        {/* Display other users - make sure we're filtering correctly */}
-        {users.length > 0 && (
-          <div className="other-users">
-            <p className="other-users-count">Other users: {users.filter(user => user.id !== socketRef.current?.id).length}</p>
-          </div>
-        )}
-        
-        {users.filter(user => {
-          console.log(`Comparing user ${user.id} with socket ID ${socketRef.current?.id}`);
-          return user.id !== socketRef.current?.id;
-        }).map(user => (
-          <div 
-            key={user.id} 
-            className={`user-bubble ${user.animationClass || ''} ${user.speaking ? 'speaking' : ''}`}
-          >
-            {user.avatar ? (
-              <img src={user.avatar} alt={user.username} />
-            ) : (
-              <div className="avatar-placeholder">
-                {user.username ? user.username.charAt(0).toUpperCase() : <FiUser />}
+        <div className="chat-messages" ref={chatRef}>
+          {chatMessages.length > 0 ? (
+            chatMessages.map(msg => (
+              <div 
+                key={msg.id} 
+                className={`chat-message ${msg.sender === username ? 'own-message' : ''} ${msg.isSystemMessage ? 'system-message' : ''}`}
+              >
+                {!msg.isSystemMessage ? (
+                  <>
+                    <div className="message-avatar">
+                      <img src={msg.avatar || '/default-avatar.png'} alt={msg.sender} />
+                    </div>
+                    <div className="message-content">
+                      <div className="message-header">
+                        <span className="message-sender">{msg.sender}</span>
+                        <span className="message-time">{formatTime(msg.timestamp)}</span>
+                      </div>
+                      <div className="message-text">{msg.text}</div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="system-message-content">
+                    <div className="message-time">{formatTime(msg.timestamp)}</div>
+                    <div className="system-message-text">{msg.text}</div>
+                  </div>
+                )}
               </div>
-            )}
-            <div className="user-name">{user.username}</div>
-            {userVolumes[user.id] > 5 && <VolumeMeter volume={userVolumes[user.id]} />}
-          </div>
-        ))}
+            ))
+          ) : (
+            <div className="no-messages">No messages yet</div>
+          )}
+        </div>
+        <div className="chat-input-container">
+          <input
+            type="text"
+            className="chat-input"
+            value={messageInput}
+            onChange={(e) => setMessageInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+            placeholder="Type a message..."
+          />
+          <button className="send-button" onClick={sendMessage}>
+            <FiSend />
+          </button>
+        </div>
       </div>
     </div>
   );

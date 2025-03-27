@@ -4,10 +4,31 @@ const User = require('../models/User');
 // Store active users in the lobby
 const activeUsers = new Map(); // socketId -> user data
 
+// Store user sessions to prevent duplicates
+const userSessions = new Map(); // userId -> socketId
+
+// Store chat messages
+let chatMessages = [];
+
+// Set up chat clearing interval - 12 hours
+const CHAT_CLEAR_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+
 // Initialize the lobby service with socket.io instance
 const initLobbyService = (io) => {
   // Create a lobby namespace
   const lobbyNamespace = io.of('/lobby');
+  
+  // Set up interval to clear chat history every 12 hours
+  const clearChatInterval = setInterval(() => {
+    console.log('Clearing chat messages (12-hour interval)');
+    chatMessages = [];
+    
+    // Broadcast chat clear event to all connected clients
+    lobbyNamespace.emit('chatCleared', {
+      timestamp: new Date().toISOString(),
+      message: 'Chat history has been cleared (12-hour interval)'
+    });
+  }, CHAT_CLEAR_INTERVAL);
 
   // Authentication middleware for socket connections
   lobbyNamespace.use(async (socket, next) => {
@@ -33,6 +54,23 @@ const initLobbyService = (io) => {
       socket.username = user.username;
       socket.avatar = user.avatar;
       
+      // Check if user already has an active session
+      if (userSessions.has(decoded.userId)) {
+        const existingSocketId = userSessions.get(decoded.userId);
+        const existingSocket = lobbyNamespace.sockets.get(existingSocketId);
+        
+        if (existingSocket) {
+          console.log(`User ${decoded.userId} already has an active session, preventing duplicate`);
+          socket.duplicateSession = true;
+        } else {
+          // Old socket no longer valid, update with this one
+          userSessions.set(decoded.userId, socket.id);
+        }
+      } else {
+        // New session, register it
+        userSessions.set(decoded.userId, socket.id);
+      }
+      
       next();
     } catch (error) {
       console.error('Socket authentication error:', error);
@@ -43,6 +81,14 @@ const initLobbyService = (io) => {
   // Handle socket connections
   lobbyNamespace.on('connection', (socket) => {
     console.log(`User connected to lobby: ${socket.userId} with socket ID: ${socket.id}`);
+    
+    // Check if this is a duplicate session
+    if (socket.duplicateSession) {
+      console.log(`Rejecting duplicate session for user ${socket.userId}`);
+      socket.emit('duplicateSession');
+      socket.disconnect();
+      return;
+    }
     
     // Send the connected user their socket ID for reference
     socket.emit('socketId', socket.id);
@@ -77,10 +123,36 @@ const initLobbyService = (io) => {
         socket.emit('lobbyUsers', allUsers);
         console.log(`Emitting 'lobbyUsers' to ${socket.id} with ${allUsers.length} users`);
         
+        // Send chat history to the newly connected client
+        socket.emit('chatHistory', chatMessages);
+        console.log(`Sending chat history to ${socket.id} with ${chatMessages.length} messages`);
+        
         console.log(`User ${user.username} (${socket.userId}) joined the lobby. Total users: ${activeUsers.size}`);
       } catch (error) {
         console.error('Error in joinLobby event:', error);
       }
+    });
+    
+    // Handle chat messages
+    socket.on('chatMessage', (message) => {
+      console.log(`Chat message from ${socket.username}: ${message.text}`);
+      
+      // Add server timestamp and store message
+      const enhancedMessage = {
+        ...message,
+        serverTimestamp: new Date().toISOString()
+      };
+      
+      // Store the message
+      chatMessages.push(enhancedMessage);
+      
+      // Limit chat history to the most recent 500 messages
+      if (chatMessages.length > 500) {
+        chatMessages = chatMessages.slice(chatMessages.length - 500);
+      }
+      
+      // Broadcast message to all users EXCEPT sender (they already have it in UI)
+      socket.broadcast.emit('chatMessage', enhancedMessage);
     });
     
     // WebRTC signaling with more debugging
@@ -187,13 +259,36 @@ const initLobbyService = (io) => {
         console.log(`User ${user.username} (${socket.userId}) left the lobby`);
         activeUsers.delete(socket.id);
         
+        // Remove user session if this was their active session
+        if (userSessions.get(user.userId) === socket.id) {
+          userSessions.delete(user.userId);
+          console.log(`Removed session for user ${user.userId}`);
+        }
+        
         // Broadcast user left event
         socket.broadcast.emit('userLeft', socket.id);
       }
     });
   });
 
-  console.log('Lobby service initialized');
+  // Debug interval to log active sessions
+  setInterval(() => {
+    console.log('Active user sessions:', userSessions.size);
+    console.log('Active socket connections:', activeUsers.size);
+  }, 60000); // Log every minute
+
+  console.log('Lobby service initialized with chat functionality and duplicate session prevention');
+  
+  // Clean up interval when the server shuts down
+  process.on('SIGTERM', () => {
+    console.log('Cleaning up chat clear interval');
+    clearInterval(clearChatInterval);
+  });
+  
+  process.on('SIGINT', () => {
+    console.log('Cleaning up chat clear interval');
+    clearInterval(clearChatInterval);
+  });
 };
 
 module.exports = {
