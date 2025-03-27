@@ -269,6 +269,8 @@ const Lobby = ({ token, username, userAvatar }) => {
 
   const setupWebRTC = async () => {
     try {
+      console.log('Setting up WebRTC - requesting user media...');
+      
       // Request user media with audio only - with specific audio constraints
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -289,156 +291,196 @@ const Lobby = ({ token, username, userAvatar }) => {
         console.log('Setting audio track enabled to false (muted)');
         track.enabled = false;
       });
+
+      // Only set up WebRTC events once we have a stream
+      setupWebRTCEvents();
       
-      // Set up WebRTC peer connections and handlers
-      socketRef.current.on('callUser', async ({ from, signal }) => {
-        console.log(`Received call from ${from} with signal type ${signal.type}`);
+      // Call existing users only once the stream is ready
+      if (socketRef.current) {
+        const lobbyUsers = users.filter(user => user.id !== socketRef.current.id);
+        console.log(`Ready to call ${lobbyUsers.length} existing users in lobby`);
         
-        // Clean up any existing connection first to prevent state issues
-        if (peerConnections[from]) {
-          console.log(`Cleaning up existing connection with ${from} before creating new one`);
-          try {
-            peerConnections[from].close();
-          } catch (err) {
-            console.error(`Error closing existing connection with ${from}:`, err);
-          }
-          
-          // Update our state
-          setPeerConnections(prev => {
-            const updated = {...prev};
-            delete updated[from];
-            return updated;
+        // Introduce a delay to ensure everything is initialized
+        setTimeout(() => {
+          lobbyUsers.forEach((user, index) => {
+            setTimeout(() => callUser(user.id), index * 1000);
           });
-          
-          // Clean up any existing audio element
-          if (audioElements.current[from]) {
-            try {
-              audioElements.current[from].srcObject = null;
-              audioElements.current[from].remove();
-              delete audioElements.current[from];
-            } catch (err) {
-              console.error(`Error cleaning up audio element for ${from}:`, err);
-            }
-          }
-        }
-        
-        // Create new peer connection for incoming call
-        const peerConnection = createPeerConnection(from);
-        
-        // Add local stream to peer connection
-        if (stream) {
-          stream.getTracks().forEach(track => {
-            console.log(`Adding ${track.kind} track to peer connection for ${from}`);
-            try {
-              peerConnection.addTrack(track, stream);
-            } catch (err) {
-              console.error(`Error adding track to connection with ${from}:`, err);
-            }
-          });
-        }
-        
-        try {
-          // Set remote description from signal
-          console.log(`Setting remote description for ${from}`);
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
-          
-          // Create answer
-          console.log(`Creating answer for ${from}`);
-          const answer = await peerConnection.createAnswer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: false
-          });
-          
-          // Set local description
-          console.log(`Setting local description for ${from}`);
-          await peerConnection.setLocalDescription(answer);
-          
-          // Send answer to caller
-          console.log(`Sending answer to ${from}`);
-          socketRef.current.emit('answerCall', {
-            to: from,
-            signal: peerConnection.localDescription
-          });
-        } catch (err) {
-          console.error(`Error processing call from ${from}:`, err);
-        }
-      });
-      
-      socketRef.current.on('callAccepted', ({ from, signal }) => {
-        // Get existing peer connection
-        const peerConnection = peerConnections[from];
-        
-        if (peerConnection) {
-          console.log(`Call accepted by ${from}, setting remote description`);
-          // Set remote description from signal
-          peerConnection.setRemoteDescription(new RTCSessionDescription(signal))
-            .then(() => {
-              console.log(`Remote description set for ${from}`);
-            })
-            .catch(err => {
-              console.error(`Error setting remote description for ${from}:`, err);
-            });
-        } else {
-          console.warn(`Received answer from ${from} but no peer connection exists`);
-        }
-      });
-      
-      // Handle ICE candidates from other peers
-      socketRef.current.on('iceCandidate', ({ from, candidate }) => {
-        console.log(`Received ICE candidate from ${from}`);
-        const peerConnection = peerConnections[from];
-        
-        if (peerConnection && peerConnection.signalingState !== 'closed') {
-          peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
-            .then(() => console.log(`Added ICE candidate for ${from}`))
-            .catch(error => console.error(`Error adding ICE candidate for ${from}:`, error));
-        } else {
-          console.warn(`Cannot add ICE candidate for ${from}: connection closed or not available`);
-        }
-      });
-      
-      // Call existing users in the room
-      socketRef.current.on('lobbyUsers', async (lobbyUsers) => {
-        const currentUserIds = Object.keys(peerConnections);
-        
-        // Call new users that joined with a small delay between each
-        for (let i = 0; i < lobbyUsers.length; i++) {
-          const user = lobbyUsers[i];
-          if (user.id !== socketRef.current.id && !currentUserIds.includes(user.id)) {
-            // Add a small delay between each call to prevent overwhelming the system
-            setTimeout(() => {
-              callUser(user.id);
-            }, i * 500);
-          }
-        }
-      });
+        }, 1000);
+      }
     } catch (error) {
       console.error('Error accessing microphone:', error);
+      setConnectionStatus('audio-error');
       alert('Could not access your microphone. Please check your permissions and try again.');
     }
   };
-
-  // Create peer connection function - no changes to this part but included for completeness
-  const createPeerConnection = (userId) => {
-    // First remove any existing connection for this user
-    if (peerConnections[userId]) {
-      console.log(`Closing existing peer connection for ${userId}`);
+  
+  // Separate function to set up WebRTC event handlers
+  const setupWebRTCEvents = () => {
+    if (!socketRef.current) return;
+    
+    // Set up WebRTC peer connections and handlers
+    socketRef.current.on('callUser', async ({ from, signal }) => {
+      console.log(`Received call from ${from} with signal type ${signal.type}`);
+      
+      // Store the signal temporarily if the connection isn't ready
+      const pendingSignal = { from, signal, type: 'offer' };
+      
+      // Clean up any existing connection first to prevent state issues
+      if (peerConnections[from]) {
+        console.log(`Cleaning up existing connection with ${from} before creating new one`);
+        try {
+          peerConnections[from].close();
+        } catch (err) {
+          console.error(`Error closing existing connection with ${from}:`, err);
+        }
+        
+        // Update our state
+        setPeerConnections(prev => {
+          const updated = {...prev};
+          delete updated[from];
+          return updated;
+        });
+        
+        // Clean up any existing audio element
+        if (audioElements.current[from]) {
+          try {
+            audioElements.current[from].srcObject = null;
+            audioElements.current[from].remove();
+            delete audioElements.current[from];
+          } catch (err) {
+            console.error(`Error cleaning up audio element for ${from}:`, err);
+          }
+        }
+      }
+      
+      // Make sure we have a local stream before proceeding
+      if (!localStream) {
+        console.error("Cannot answer call: No local stream available");
+        return;
+      }
+      
+      // Create new peer connection for incoming call
+      const peerConnection = createPeerConnection(from);
+      
       try {
-        peerConnections[userId].close();
+        // Add local stream to peer connection
+        localStream.getTracks().forEach(track => {
+          console.log(`Adding ${track.kind} track to peer connection for ${from}`);
+          try {
+            peerConnection.addTrack(track, localStream);
+          } catch (err) {
+            console.error(`Error adding track to connection with ${from}:`, err);
+          }
+        });
+        
+        // Set remote description from signal
+        console.log(`Setting remote description for ${from}`);
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
+        
+        // Create answer
+        console.log(`Creating answer for ${from}`);
+        const answer = await peerConnection.createAnswer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: false
+        });
+        
+        // Set local description
+        console.log(`Setting local description for ${from}`);
+        await peerConnection.setLocalDescription(answer);
+        
+        // Send answer to caller
+        console.log(`Sending answer to ${from}`);
+        socketRef.current.emit('answerCall', {
+          to: from,
+          signal: peerConnection.localDescription
+        });
+      } catch (err) {
+        console.error(`Error processing call from ${from}:`, err);
+      }
+    });
+    
+    socketRef.current.on('callAccepted', ({ from, signal }) => {
+      // Get existing peer connection
+      const peerConnection = peerConnections[from];
+      
+      if (peerConnection) {
+        console.log(`Call accepted by ${from}, setting remote description`);
+        // Set remote description from signal
+        peerConnection.setRemoteDescription(new RTCSessionDescription(signal))
+          .then(() => {
+            console.log(`Remote description set for ${from}`);
+          })
+          .catch(err => {
+            console.error(`Error setting remote description for ${from}:`, err);
+          });
+      } else {
+        console.warn(`Received answer from ${from} but no peer connection exists`);
+      }
+    });
+    
+    // Handle ICE candidates from other peers
+    socketRef.current.on('iceCandidate', ({ from, candidate }) => {
+      console.log(`Received ICE candidate from ${from}`);
+      const peerConnection = peerConnections[from];
+      
+      // If we don't have a connection yet, buffer the ICE candidates
+      if (!peerConnection) {
+        console.log(`No peer connection for ${from} yet, buffering ICE candidate`);
+        return; // We'll just drop these for now as we recreate connections frequently
+      }
+      
+      if (peerConnection.signalingState !== 'closed') {
+        peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
+          .then(() => console.log(`Added ICE candidate for ${from}`))
+          .catch(error => console.error(`Error adding ICE candidate for ${from}:`, error));
+      } else {
+        console.warn(`Cannot add ICE candidate for ${from}: connection closed or not available`);
+      }
+    });
+  };
+
+  const createPeerConnection = (userId) => {
+    console.log(`Creating peer connection for ${userId}`);
+    
+    // If we have an existing connection, clean it up properly
+    if (peerConnections[userId]) {
+      try {
+        const oldConnection = peerConnections[userId];
+        console.log(`Closing existing peer connection for ${userId}`, oldConnection.signalingState);
+        oldConnection.onicecandidate = null;
+        oldConnection.ontrack = null;
+        oldConnection.onnegotiationneeded = null;
+        oldConnection.oniceconnectionstatechange = null;
+        oldConnection.close();
       } catch (err) {
         console.error(`Error closing existing peer connection for ${userId}:`, err);
       }
     }
     
     // Create new RTCPeerConnection with expanded ICE servers
-    console.log(`Creating new peer connection for ${userId}`);
     const peerConnection = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
-        { urls: 'stun:stun4.l.google.com:19302' }
+        { urls: 'stun:stun4.l.google.com:19302' },
+        // Free TURN servers - using public test servers
+        {
+          urls: 'turn:relay.metered.ca:80',
+          username: 'e8c6d63db6f3fc61a8b1e239',
+          credential: 'hkA2QQkJhYkNvCOE'
+        },
+        {
+          urls: 'turn:relay.metered.ca:443',
+          username: 'e8c6d63db6f3fc61a8b1e239',
+          credential: 'hkA2QQkJhYkNvCOE'
+        },
+        {
+          urls: 'turn:relay.metered.ca:443?transport=tcp',
+          username: 'e8c6d63db6f3fc61a8b1e239',
+          credential: 'hkA2QQkJhYkNvCOE'
+        }
       ],
       iceCandidatePoolSize: 10,
       iceTransportPolicy: 'all',
@@ -449,7 +491,7 @@ const Lobby = ({ token, username, userAvatar }) => {
     // Set up ICE candidate handling
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(`Generated ICE candidate for connection with ${userId}:`, event.candidate);
+        console.log(`Generated ICE candidate for connection with ${userId}`);
         socketRef.current.emit('iceCandidate', {
           to: userId,
           candidate: event.candidate
@@ -502,53 +544,72 @@ const Lobby = ({ token, username, userAvatar }) => {
       // Use the first stream
       const stream = event.streams[0];
       
-      // Wait a moment for the stream to initialize
-      setTimeout(() => {
-        try {
-          // Create audio element for remote stream if it doesn't exist or recreate it
-          if (audioElements.current[userId]) {
-            console.log(`Updating existing audio element for ${userId}`);
-            audioElements.current[userId].srcObject = stream;
-            audioElements.current[userId].volume = audioVolume / 100;
-            
-            // Make sure it's playing
-            audioElements.current[userId].play()
-              .then(() => console.log(`Updated audio playback for ${userId}`))
-              .catch(e => console.error(`Error playing updated stream for ${userId}:`, e));
-          } else {
-            console.log(`Creating new audio element for ${userId}`);
-            const audioEl = document.createElement('audio');
-            audioEl.id = `audio-${userId}`;
-            audioEl.autoplay = true;
-            audioEl.controls = false; // No visible controls in production
-            audioEl.style.display = 'none'; // Hide from view
-            audioEl.srcObject = stream;
-            audioEl.volume = audioVolume / 100;
-            audioEl.muted = false;
-            
-            // Listen for audio playback events
-            audioEl.addEventListener('play', () => console.log(`Audio from ${userId} playing`));
-            audioEl.addEventListener('pause', () => console.log(`Audio from ${userId} paused`));
-            audioEl.addEventListener('error', (e) => console.error(`Audio error for ${userId}:`, e));
-            
-            document.body.appendChild(audioEl);
-            audioElements.current[userId] = audioEl;
-            
-            // Force play the audio
+      // Create or update audio element immediately
+      try {
+        if (audioElements.current[userId]) {
+          console.log(`Updating existing audio element for ${userId}`);
+          audioElements.current[userId].srcObject = stream;
+          audioElements.current[userId].volume = audioVolume / 100;
+        } else {
+          console.log(`Creating new audio element for ${userId}`);
+          const audioEl = document.createElement('audio');
+          audioEl.id = `audio-${userId}`;
+          audioEl.autoplay = true;
+          audioEl.playsInline = true; // Important for iOS
+          audioEl.controls = true; // Enable controls for debugging
+          audioEl.style.position = 'fixed';
+          audioEl.style.bottom = '0';
+          audioEl.style.right = '0';
+          audioEl.style.zIndex = '9999';
+          audioEl.style.width = '200px';
+          audioEl.srcObject = stream;
+          audioEl.volume = audioVolume / 100;
+          audioEl.muted = false;
+          
+          // Add event listeners for debugging
+          audioEl.addEventListener('play', () => console.log(`Audio element for ${userId} started playing`));
+          audioEl.addEventListener('pause', () => console.log(`Audio element for ${userId} paused`));
+          audioEl.addEventListener('canplay', () => console.log(`Audio element for ${userId} can play`));
+          audioEl.addEventListener('canplaythrough', () => console.log(`Audio element for ${userId} can play through`));
+          audioEl.addEventListener('error', (e) => console.error(`Audio element error for ${userId}:`, e));
+          
+          // Add the element to the DOM
+          document.body.appendChild(audioEl);
+          audioElements.current[userId] = audioEl;
+          
+          // Force play with retry mechanism
+          const playWithRetry = (retries = 5) => {
+            console.log(`Attempting to play audio from ${userId}, ${retries} attempts left`);
             audioEl.play()
               .then(() => console.log(`Successfully playing audio from ${userId}`))
-              .catch(error => console.error(`Error playing audio from ${userId}:`, error));
-          }
+              .catch(error => {
+                console.error(`Error playing audio from ${userId}:`, error);
+                if (retries > 0) {
+                  console.log(`Retrying playback for ${userId} in 1 second`);
+                  setTimeout(() => playWithRetry(retries - 1), 1000);
+                } else {
+                  console.error(`Failed to play audio after multiple attempts for ${userId}`);
+                  // Try with user interaction simulation as a last resort
+                  document.addEventListener('click', function playOnClick() {
+                    audioEl.play()
+                      .then(() => {
+                        console.log(`Played audio after user interaction for ${userId}`);
+                        document.removeEventListener('click', playOnClick);
+                      })
+                      .catch(e => console.error(`Still couldn't play audio for ${userId}:`, e));
+                  }, { once: true });
+                }
+              });
+          };
           
-          // Update UI to show user is speaking
-          setUsers(prevUsers => 
-            prevUsers.map(user => 
-              user.id === userId ? { ...user, speaking: true } : user
-            )
-          );
-          
-          // Set up audio analyzer to detect speaking
-          if (!audioContexts.current[userId]) {
+          playWithRetry();
+        }
+        
+        // Set up audio analyzer to detect speaking
+        if (!audioContexts.current[userId]) {
+          try {
+            // Create audio analyzer only after ensuring the stream and element exist
+            console.log(`Setting up audio analyzer for ${userId}`);
             const audioContext = new AudioContext();
             audioContexts.current[userId] = audioContext;
             const source = audioContext.createMediaStreamSource(stream);
@@ -573,6 +634,11 @@ const Lobby = ({ token, username, userAvatar }) => {
               }
               const average = sum / dataArray.length;
               const volume = Math.min(100, average * 3); // Scale to 0-100
+              
+              // Debug level
+              if (average > 0) {
+                console.log(`Audio level for ${userId}: ${average.toFixed(2)}, volume: ${volume.toFixed(2)}`);
+              }
               
               // Update volume level for this user
               setUserVolumes(prev => ({
@@ -604,11 +670,13 @@ const Lobby = ({ token, username, userAvatar }) => {
             };
             
             checkAudioLevel();
+          } catch (error) {
+            console.error(`Error setting up audio analyzer for ${userId}:`, error);
           }
-        } catch (error) {
-          console.error(`Error handling track from ${userId}:`, error);
         }
-      }, 500); // 500ms delay to ensure stream is ready
+      } catch (error) {
+        console.error(`Error handling track from ${userId}:`, error);
+      }
     };
     
     // Store the peer connection
@@ -621,25 +689,32 @@ const Lobby = ({ token, username, userAvatar }) => {
   };
   
   const callUser = async (userId) => {
+    if (!localStream) {
+      console.error("Cannot call user: No local stream available");
+      return;
+    }
+    
     try {
       console.log(`Initiating call to user ${userId}`);
       
-      // Create a fresh peer connection - don't reuse existing ones to avoid state issues
+      // Ensure we're still connected to the socket
+      if (!socketRef.current || !socketRef.current.connected) {
+        console.error("Cannot call user: Socket not connected");
+        return;
+      }
+      
+      // Create a fresh peer connection
       const peerConnection = createPeerConnection(userId);
       
-      // Add local stream to peer connection if available
-      if (localStream) {
-        console.log(`Adding tracks to connection with ${userId}`);
-        localStream.getTracks().forEach(track => {
-          try {
-            peerConnection.addTrack(track, localStream);
-          } catch (error) {
-            console.error(`Error adding track to connection with ${userId}:`, error);
-          }
-        });
-      } else {
-        console.warn(`No local stream available when calling ${userId}`);
-      }
+      // Add all tracks from local stream to peer connection
+      localStream.getTracks().forEach(track => {
+        console.log(`Adding ${track.kind} track to peer connection for ${userId}`);
+        try {
+          peerConnection.addTrack(track, localStream);
+        } catch (error) {
+          console.error(`Error adding track to connection with ${userId}:`, error);
+        }
+      });
       
       // Create offer
       console.log(`Creating offer for ${userId}`);
@@ -652,23 +727,28 @@ const Lobby = ({ token, username, userAvatar }) => {
       console.log(`Setting local description for ${userId}`);
       await peerConnection.setLocalDescription(offer);
       
-      // Send the offer after a short delay to ensure ICE gathering has started
+      // Give time for ICE gathering before sending the offer
+      // This helps ensure more ICE candidates are included in the initial offer
       setTimeout(() => {
-        if (peerConnection.signalingState !== 'closed') {
-          const currentOffer = peerConnection.localDescription;
-          console.log(`Sending offer to ${userId}:`, currentOffer);
-          
-          // Send offer to user
-          socketRef.current.emit('callUser', {
-            to: userId,
-            signal: currentOffer
-          });
-        } else {
+        if (!peerConnection || peerConnection.signalingState === 'closed') {
           console.log(`Connection closed before offer could be sent to ${userId}`);
+          return;
         }
-      }, 500);
+        
+        const currentOffer = peerConnection.localDescription;
+        if (!currentOffer) {
+          console.error(`No local description available for ${userId}`);
+          return;
+        }
+        
+        console.log(`Sending offer to ${userId}`);
+        socketRef.current.emit('callUser', {
+          to: userId,
+          signal: currentOffer
+        });
+      }, 1000); // Wait 1 second for ICE gathering
     } catch (error) {
-      console.error('Error calling user:', error);
+      console.error(`Error calling user ${userId}:`, error);
     }
   };
 
@@ -876,8 +956,66 @@ const Lobby = ({ token, username, userAvatar }) => {
               onChange={handleAudioVolumeChange}
             />
           </div>
-          <div className="connection-status">
-            Status: <span className={`status-${connectionStatus}`}>{connectionStatus}</span>
+          <div className="connection-controls">
+            <div className="connection-status">
+              Status: <span className={`status-${connectionStatus}`}>{connectionStatus}</span>
+            </div>
+            <button 
+              className="reconnect-button"
+              onClick={() => {
+                // Clean up all connections
+                console.log("Manual reconnect initiated");
+                Object.keys(peerConnections).forEach(peerId => {
+                  if (peerConnections[peerId]) {
+                    console.log(`Closing connection to ${peerId}`);
+                    try {
+                      peerConnections[peerId].close();
+                    } catch (e) {
+                      console.error(`Error closing connection to ${peerId}:`, e);
+                    }
+                  }
+                });
+                
+                // Clear connections state
+                setPeerConnections({});
+                
+                // Reset audio elements
+                Object.keys(audioElements.current).forEach(id => {
+                  if (audioElements.current[id]) {
+                    try {
+                      audioElements.current[id].srcObject = null;
+                      audioElements.current[id].remove();
+                    } catch (e) {
+                      console.error(`Error removing audio element for ${id}:`, e);
+                    }
+                  }
+                });
+                audioElements.current = {};
+                
+                // Reset audio contexts
+                Object.keys(audioContexts.current).forEach(id => {
+                  if (audioContexts.current[id]) {
+                    try {
+                      audioContexts.current[id].close();
+                    } catch (e) {
+                      console.error(`Error closing audio context for ${id}:`, e);
+                    }
+                  }
+                });
+                audioContexts.current = {};
+                
+                // Call all users again with slight delay
+                setTimeout(() => {
+                  users.forEach((user, index) => {
+                    if (user.id !== socketRef.current?.id) {
+                      setTimeout(() => callUser(user.id), index * 1000);
+                    }
+                  });
+                }, 1000);
+              }}
+            >
+              Reconnect Audio
+            </button>
           </div>
         </div>
         <div className="users-list">
