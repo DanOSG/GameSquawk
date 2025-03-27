@@ -1,7 +1,7 @@
 # GameSquawk - Gaming Community Platform
 
 ## 📱 Overview
-GameSquawk is a dynamic web platform designed for gamers to connect, share experiences, discuss games, and build a thriving gaming community. The application allows users to create posts about their favorite games, like and comment on others' content, and engage in gaming discussions.
+GameSquawk is a dynamic web platform designed for gamers to connect, share experiences, discuss games, and build a thriving gaming community. The application allows users to create posts about their favorite games, like and comment on others' content, engage in gaming discussions, participate in voice chat rooms, and share gameplay videos.
 
 ## ✨ Features
 - **User Authentication**: Secure signup and login system
@@ -9,11 +9,13 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 - **Categories**: Organize posts by game categories
 - **Interaction**: Like, dislike, and comment on posts
 - **Real-time Updates**: Instant notifications using Socket.io
+- **Voice Chat**: Dedicated media relay server for high-quality voice communication
+- **Video Sharing**: Upload and share gameplay videos with Google Drive integration
 - **Dark/Light Mode**: Customizable interface theme
 - **Responsive Design**: Works on desktop and mobile devices
 - **HTTPS Support**: Secure connection with SSL/TLS
 - **Domain Configuration**: Custom domain support
-- **Social Login**: Optional integration with Discord, Steam, and Xbox Live (requires additional setup)
+- **Media Handling**: Dedicated media relay server for voice chat and future media features
 
 ## 🔧 Technology Stack
 ### Frontend
@@ -21,6 +23,7 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 - CSS for styling
 - Socket.io client for real-time features
 - Markdown rendering for rich content
+- WebSocket audio streaming for voice chat
 - Environment variables for dynamic configuration
 
 ### Backend
@@ -32,6 +35,12 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 - Let's Encrypt for SSL certificates
 - Passport.js for authentication strategies
 
+### Media Relay Server
+- Dedicated WebSocket server for voice chat
+- Optimized for low-latency audio streaming
+- Scalable architecture for multiple rooms
+- PM2 for process management
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -40,7 +49,7 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
 - npm or yarn package manager
 - (Optional) Nginx for production deployment
 - (Optional) Domain name for production deployment
-- (Optional) API keys for social login providers
+- (Optional) Second VPS for media relay server
 
 ### Installation
 
@@ -62,21 +71,12 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
    DB_HOST=localhost
    DB_USER=your_database_username
    DB_PASSWORD=your_database_password
-   DB_NAME=database_db
+   DB_NAME=gamesquawk_db
    JWT_SECRET=your_jwt_secret
    
-   # Optional - Social login (Discord)
-   # DISCORD_CLIENT_ID=your_discord_client_id
-   # DISCORD_CLIENT_SECRET=your_discord_client_secret
-   # DISCORD_CALLBACK_URL=http://localhost:3001/api/auth/discord/callback
-   
-   # Optional - Social login (Steam)
-   # STEAM_API_KEY=your_steam_api_key
-   # STEAM_RETURN_URL=http://localhost:3001/api/auth/steam/return
-   # STEAM_REALM=http://localhost:3001/
+   # Client URL (for redirects)
+   CLIENT_URL=http://localhost:3000
    ```
-
-   > **Important**: The application will run without the optional social login variables, but those login methods will be disabled. You must include `express-session` in your dependencies.
 
 4. Start the server:
    ```
@@ -98,9 +98,11 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
    ```
    # For local development
    REACT_APP_API_URL=http://localhost:3001
+   REACT_APP_MEDIA_SERVER_URL=http://localhost:3002
    
    # For production with domain (uncomment when deploying)
    # REACT_APP_API_URL=https://yourdomain.com
+   # REACT_APP_MEDIA_SERVER_URL=https://media.yourdomain.com
    ```
 
 4. Start the development server:
@@ -113,11 +115,33 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
    http://localhost:3000
    ```
 
+#### Setting up the Media Relay Server
+1. Navigate to the media-relay-server directory:
+   ```
+   cd GameSquawk/media-relay-server
+   ```
+
+2. Install dependencies:
+   ```
+   npm install --production
+   ```
+
+3. Create a `.env` file:
+   ```
+   PORT=3002
+   CLIENT_URL=http://localhost:3000
+   ```
+
+4. Start the server:
+   ```
+   node server.js
+   ```
+
 ### Production Deployment
 
 #### Domain Configuration
 1. Update your domain's DNS settings to point to your server IP
-2. Configure Nginx:
+2. Configure Nginx for the main application:
    ```
    server {
        server_name yourdomain.com;
@@ -158,21 +182,39 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
    }
    ```
 
+3. Configure Nginx for the media relay server:
+   ```
+   server {
+       server_name media.yourdomain.com;
+       
+       location / {
+           proxy_pass http://localhost:3002;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_cache_bypass $http_upgrade;
+       }
+   }
+   ```
+
 #### SSL Configuration
 1. Install Certbot and the Nginx plugin:
    ```
    apt update && apt install -y certbot python3-certbot-nginx
    ```
 
-2. Obtain and configure SSL certificate:
+2. Obtain and configure SSL certificates:
    ```
    certbot --nginx -d yourdomain.com
+   certbot --nginx -d media.yourdomain.com
    ```
 
 3. Update frontend environment:
    ```
    # frontend/.env
    REACT_APP_API_URL=https://yourdomain.com
+   REACT_APP_MEDIA_SERVER_URL=https://media.yourdomain.com
    ```
 
 4. Rebuild the frontend:
@@ -191,30 +233,36 @@ GameSquawk is a dynamic web platform designed for gamers to connect, share exper
    cd backend && pm2 start app.js --name "gamesquawk-backend"
    ```
 
-3. Serve the frontend build:
+3. Start the media relay server:
+   ```
+   cd media-relay-server && pm2 start server.js --name "gamesquawk-media"
+   ```
+
+4. Serve the frontend build:
    ```
    cd frontend && pm2 start npm --name "gamesquawk-frontend" -- start
    ```
 
-4. Configure PM2 to start on boot:
+5. Configure PM2 to start on boot:
    ```
    pm2 startup
    pm2 save
    ```
 
 ## 📖 How to Use
-1. **Register/Login**: Create an account or log in to access features
-2. **Create Posts**: Share your gaming experiences using the post form
-3. **Interact**: Like posts and leave comments to engage with others
-4. **Customize**: Switch between dark and light mode for comfortable viewing
+1. **Register/Login**: Create an account or log in using email
+2. **Create Posts**: Share your gaming experiences using the post form with markdown support
+3. **Share Videos**: Upload and share your gameplay videos
+4. **Interact**: Like posts and leave comments to engage with others
+5. **Voice Chat**: Join voice chat rooms to discuss games in real-time
+6. **Customize**: Switch between dark and light mode for comfortable viewing
 
 ## 🔧 Troubleshooting
 
 ### Missing Environment Variables
-If you encounter OAuth or authentication errors during startup:
+If you encounter authentication errors during startup:
 1. Check if your backend `.env` file has all required variables
-2. For social login, ensure all provider-specific variables are set or comment them out if not needed
-3. Make sure to install the `express-session` package: `npm install express-session`
+2. Make sure to install the `express-session` package: `npm install express-session`
 
 ### Dependency Compatibility Issues
 If you encounter errors related to dependencies when installing or running the application (especially with React 19), use the following commands:
@@ -233,7 +281,7 @@ These issues occur because some packages have peer dependencies on older React v
 
 ### SSL/HTTPS Issues
 If you encounter mixed content warnings:
-1. Ensure your `.env` file has `REACT_APP_API_URL` set to use `https://` protocol
+1. Ensure your `.env` files have URLs set to use `https://` protocol
 2. Rebuild the frontend application after making changes
 3. Check browser console for specific error messages
 
@@ -243,153 +291,50 @@ If profile images are not showing after upload:
 2. Check the permissions on the `/backend/public/uploads` directory
 3. Restart Nginx after making configuration changes
 
+### Voice Chat Issues
+If you experience problems with voice chat:
+1. Check the media relay server logs: `pm2 logs gamesquawk-media`
+2. Verify microphone permissions in your browser
+3. Ensure the media server URL is correctly set in your frontend `.env` file
+4. Check if your firewall allows WebSocket connections on port 3002
+
+### Video Upload Issues
+If you experience problems with video uploads:
+1. Check if your video file is under the 100MB limit
+2. Verify that the video format is supported (MP4, WebM)
+3. Ensure you have proper Google Drive API credentials configured
+4. Check the browser console for any upload-related errors
+
 ## 📱 Project Structure
 ```
 GameSquawk/
-├── backend/          # Server-side code
+├── frontend/          # React application
+│   ├── src/          # Source code
+│   │   ├── VideoUpload.js    # Video upload component
+│   │   ├── VideoList.js      # Video browsing component
+│   │   └── VideoDetail.js    # Video viewing component
+│   ├── public/       # Static files
+│   └── build/        # Production build
+├── backend/          # Node.js server
 │   ├── config/       # Database configuration
-│   ├── controllers/  # Request handlers
-│   ├── middleware/   # Auth middleware
+│   ├── controllers/  # Route controllers
+│   │   └── videoController.js  # Video operations
 │   ├── models/       # Database models
-│   └── routes/       # API endpoints
-│
-└── frontend/         # Client-side code
-    ├── public/       # Static files
-    └── src/          # React components
-        └── components/ # UI components
+│   │   └── Video.js  # Video metadata model
+│   ├── routes/       # API routes
+│   │   └── videoRoutes.js  # Video endpoints
+│   ├── services/     # Business logic
+│   │   └── googleDriveService.js  # Google Drive integration
+│   ├── middleware/   # Custom middleware
+│   └── socket/       # Socket.io handlers
+├── media-relay-server/  # Voice chat server
+│   ├── server.js     # Main server file
+│   └── deploy/       # Deployment scripts
+└── presentation/     # Project presentation
+    └── GameSquawk_Presentation.pptx
 ```
 
-## 🤝 Contributing
-Contributions, issues, and feature requests are welcome! Feel free to check the issues page.
-
-## 📄 License
-All rights reserved. This project is proprietary software. Unauthorized copying, modification, distribution, or use of this software, via any medium, is strictly prohibited without express permission from the author.
-
-## Voice Chat Solution
-
-The voice chat feature uses a dedicated media relay server for audio transmission instead of WebRTC peer-to-peer connections. This approach provides more reliability and better performance for multi-user voice chat.
-
-### Project Structure
-
-- `frontend/` - React frontend application
-- `backend/` - Main API server handling authentication, chat history, etc.
-- `media-relay-server/` - Dedicated server for handling audio streaming
-
-## Setup Instructions
-
-### Local Development Setup
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd GameSquawk
-```
-
-2. Set up and start the backend server:
-```bash
-cd backend
-npm install
-npm run dev
-```
-
-3. Set up and start the media relay server:
-```bash
-cd media-relay-server
-npm install
-npm run dev
-```
-
-4. Set up and start the frontend application:
-```bash
-cd frontend
-npm install
-npm start
-```
-
-### Environment Configuration
-
-#### Backend Server (.env)
-```
-PORT=3001
-DB_CONNECTION_STRING=your_database_connection_string
-JWT_SECRET=your_jwt_secret
-```
-
-#### Media Relay Server (.env)
-```
-PORT=3002
-CLIENT_URL=http://localhost:3000
-```
-
-#### Frontend (.env)
-```
-REACT_APP_API_URL=http://localhost:3001
-REACT_APP_MEDIA_SERVER_URL=http://localhost:3002
-REACT_APP_RAWG_API_KEY=your_rawg_api_key
-```
-
-## Testing the Voice Chat Feature
-
-### Method 1: Using the Test Client
-
-We've included a dedicated test client to verify the media relay server functionality:
-
-**For Windows Users:**
-```
-cd media-relay-server
-test.bat
-```
-
-**For Linux/Mac Users:**
-```
-cd media-relay-server
-npm run test:room1
-```
-
-In another terminal:
-```
-cd media-relay-server
-npm run test:room1:user2
-```
-
-### Method 2: Using the Application
-
-1. Open two different browsers or incognito windows
-2. Log in with two different accounts
-3. Join the same lobby/room
-4. Enable the microphone on both clients
-5. Test voice communication
-
-## Production Deployment
-
-For detailed production deployment instructions, see:
-
-- [VOICE-CHAT-SETUP.md](./VOICE-CHAT-SETUP.md) - Detailed setup for the voice chat solution
-- `media-relay-server/deploy.ps1` - Windows deployment script
-- `media-relay-server/deploy.sh` - Linux deployment script
-
-## Troubleshooting
-
-### Common Voice Chat Issues
-
-1. **No sound in voice chat**
-   - Check microphone permissions in your browser
-   - Verify that the media server connection status shows as connected
-   - Check browser console for any errors
-
-2. **High voice chat latency**
-   - The default settings balance quality and latency
-   - For lower latency (at the cost of quality), you can adjust the recorder settings in the frontend code
-
-3. **Connection issues**
-   - Ensure both servers are running
-   - Check the environment variables are correctly set
-   - Verify that your browser supports the required audio APIs
-
-## Contributing
-
-Please follow the project's code style and contribution guidelines when submitting pull requests.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+## 📚 Additional Documentation
+- [Voice Chat Setup Guide](VOICE-CHAT-SETUP.md)
+- [Developer Guide](DEVELOPER-GUIDE.md)
+- [Video Feature Documentation](README-VideoFeature.md)
