@@ -164,10 +164,15 @@ const initLobbyService = (io) => {
       if (activeUsers.has(to)) {
         console.log(`Target user ${to} is active, forwarding call`);
         
-        // Use socket.io emit with optional acknowledgment callback
+        // Use socket.io callback to ensure delivery
         lobbyNamespace.to(to).emit('callUser', {
           from: socket.id,
           signal
+        }, (ack) => {
+          // This callback will fire when the client acknowledges receipt
+          if (ack && ack.received) {
+            console.log(`User ${to} has acknowledged receipt of call`);
+          }
         });
         
         // Also notify the caller that the call is being processed
@@ -192,10 +197,13 @@ const initLobbyService = (io) => {
       if (activeUsers.has(to)) {
         console.log(`Target user ${to} is active, forwarding answer`);
         
-        // Forward the answer signal
         lobbyNamespace.to(to).emit('callAccepted', {
           from: socket.id,
           signal
+        }, (ack) => {
+          if (ack && ack.received) {
+            console.log(`User ${to} acknowledged receipt of answer`);
+          }
         });
         
         // Notify answerer that the connection is established
@@ -216,19 +224,10 @@ const initLobbyService = (io) => {
       console.log(`User ${socket.id} is sending ICE candidate to ${to}`);
       
       if (activeUsers.has(to)) {
-        try {
-          // Forward the ICE candidate immediately
-          lobbyNamespace.to(to).emit('iceCandidate', {
-            from: socket.id,
-            candidate
-          });
-        } catch (error) {
-          console.error(`Error forwarding ICE candidate to ${to}:`, error);
-          socket.emit('iceCandidateError', {
-            to,
-            error: 'Error forwarding ICE candidate'
-          });
-        }
+        lobbyNamespace.to(to).emit('iceCandidate', {
+          from: socket.id,
+          candidate
+        });
       } else {
         console.log(`Target user ${to} is not active, ICE candidate cannot be delivered`);
         socket.emit('iceCandidateError', {

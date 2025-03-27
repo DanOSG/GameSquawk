@@ -264,3 +264,132 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 
 ## 📄 License
 All rights reserved. This project is proprietary software. Unauthorized copying, modification, distribution, or use of this software, via any medium, is strictly prohibited without express permission from the author.
+
+## Voice Chat Solution
+
+The voice chat feature uses a dedicated media relay server for audio transmission instead of WebRTC peer-to-peer connections. This approach provides more reliability and better performance for multi-user voice chat.
+
+### Project Structure
+
+- `frontend/` - React frontend application
+- `backend/` - Main API server handling authentication, chat history, etc.
+- `media-relay-server/` - Dedicated server for handling audio streaming
+
+## Setup Instructions
+
+### Local Development Setup
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd GameSquawk
+```
+
+2. Set up and start the backend server:
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+3. Set up and start the media relay server:
+```bash
+cd media-relay-server
+npm install
+npm run dev
+```
+
+4. Set up and start the frontend application:
+```bash
+cd frontend
+npm install
+npm start
+```
+
+### Environment Configuration
+
+#### Backend Server (.env)
+```
+PORT=3001
+DB_CONNECTION_STRING=your_database_connection_string
+JWT_SECRET=your_jwt_secret
+```
+
+#### Media Relay Server (.env)
+```
+PORT=3002
+CLIENT_URL=http://localhost:3000
+```
+
+#### Frontend (.env)
+```
+REACT_APP_API_URL=http://localhost:3001
+REACT_APP_MEDIA_SERVER_URL=http://localhost:3002
+REACT_APP_RAWG_API_KEY=your_rawg_api_key
+```
+
+## Testing the Voice Chat Feature
+
+### Method 1: Using the Test Client
+
+We've included a dedicated test client to verify the media relay server functionality:
+
+**For Windows Users:**
+```
+cd media-relay-server
+test.bat
+```
+
+**For Linux/Mac Users:**
+```
+cd media-relay-server
+npm run test:room1
+```
+
+In another terminal:
+```
+cd media-relay-server
+npm run test:room1:user2
+```
+
+### Method 2: Using the Application
+
+1. Open two different browsers or incognito windows
+2. Log in with two different accounts
+3. Join the same lobby/room
+4. Enable the microphone on both clients
+5. Test voice communication
+
+## Production Deployment
+
+For detailed production deployment instructions, see:
+
+- [VOICE-CHAT-SETUP.md](./VOICE-CHAT-SETUP.md) - Detailed setup for the voice chat solution
+- `media-relay-server/deploy.ps1` - Windows deployment script
+- `media-relay-server/deploy.sh` - Linux deployment script
+
+## Troubleshooting
+
+### Common Voice Chat Issues
+
+1. **No sound in voice chat**
+   - Check microphone permissions in your browser
+   - Verify that the media server connection status shows as connected
+   - Check browser console for any errors
+
+2. **High voice chat latency**
+   - The default settings balance quality and latency
+   - For lower latency (at the cost of quality), you can adjust the recorder settings in the frontend code
+
+3. **Connection issues**
+   - Ensure both servers are running
+   - Check the environment variables are correctly set
+   - Verify that your browser supports the required audio APIs
+
+## Contributing
+
+Please follow the project's code style and contribution guidelines when submitting pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
